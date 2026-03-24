@@ -19,6 +19,7 @@
 4. [docs/04-implementation-plan.md](./docs/04-implementation-plan.md)
 5. [docs/05-testing-and-acceptance.md](./docs/05-testing-and-acceptance.md)
 6. [docs/06-documentation-governance.md](./docs/06-documentation-governance.md)
+7. [docs/07-roadmap-and-progress.md](./docs/07-roadmap-and-progress.md)
 
 ## Task-Based Reading
 
@@ -27,6 +28,7 @@
 - 实现项目骨架或主流程：`01 + 02 + 04 + 05`
 - 实现 agent、tool、state、workspace：`01 + 02 + 03 + 05`
 - 只做测试：`03 + 05`
+- 看当前进度和接下来做什么：`04 + 07`
 - 更新文档结构或规则：`06 + 相关主题文档`
 
 ## Source Of Truth
@@ -41,6 +43,7 @@
 | 实现阶段、交付顺序、AI 执行方式 | [docs/04-implementation-plan.md](./docs/04-implementation-plan.md) |
 | 测试范围、验收标准、完成定义 | [docs/05-testing-and-acceptance.md](./docs/05-testing-and-acceptance.md) |
 | 文档写法、冲突处理、维护流程 | [docs/06-documentation-governance.md](./docs/06-documentation-governance.md) |
+| 当前进度、下一步任务和执行优先级 | [docs/07-roadmap-and-progress.md](./docs/07-roadmap-and-progress.md) |
 
 ## Working Rules
 
