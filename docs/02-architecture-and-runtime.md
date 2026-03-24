@@ -181,3 +181,13 @@ WEB_SEARCH_PROVIDER=stub
 3. 最后再考虑节点抽象、condition、edge 等图模型
 
 当前阶段不得为了未来扩展而提前引入复杂调度框架。
+
+## 8. Current Reference Implementation Notes
+
+当前参考实现允许以下工程取舍：
+
+- retrieval 使用本地 deterministic embedding 和 JSON vector store 作为 MVP 默认实现
+- 没有模型配置时，agent 允许走 stub 路径，但对外 contract 不变
+- web search 当前默认是 stub provider
+
+这些取舍可以在后续替换，但替换时不得破坏 `03-agent-and-tool-contracts.md` 中定义的接口稳定性。

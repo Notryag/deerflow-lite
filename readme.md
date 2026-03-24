@@ -56,3 +56,11 @@
 - 显式编排优先，拒绝黑盒链式主流程
 - workspace 落盘优先，便于调试、恢复和后续 UI/API 接入
 - 允许 stub，但接口必须稳定、测试必须覆盖
+
+## Current Implementation
+
+当前仓库已经包含一个可运行的 MVP 骨架：
+
+- CLI: `python -m app.cli.main run "...task..." --data-dir ./docs`
+- 测试: `python -m unittest discover -s tests -v`
+- 默认行为: 没有模型配置时走本地 stub agents；retrieval 使用本地 deterministic embedding 和 JSON vector store

@@ -118,3 +118,21 @@ AI CLI 或自动化实现时，必须遵守以下规则：
 4. 可扩展
 
 不得为了“看起来完整”而牺牲当前可运行性。
+
+## 6. Current MVP Status
+
+截至当前版本，已经完成：
+
+- 项目骨架
+- `RunState`、workspace、logger
+- file tools、retrieval pipeline、retrieval tool
+- orchestrator、research agent、writer agent
+- `run_task` workflow
+- CLI 入口
+- 基础测试
+
+当前明确保留为 stub 或轻量实现的部分：
+
+- web search provider
+- online model path 在无 API key 时退回 stub agents
+- embedding 和 vector store 使用本地轻量实现，而不是外部服务
