@@ -20,6 +20,7 @@
 5. [docs/05-testing-and-acceptance.md](./docs/05-testing-and-acceptance.md)
 6. [docs/06-documentation-governance.md](./docs/06-documentation-governance.md)
 7. [docs/07-roadmap-and-progress.md](./docs/07-roadmap-and-progress.md)
+8. [docs/08-codebase-map.md](./docs/08-codebase-map.md)
 
 ## Task-Based Reading
 
@@ -29,6 +30,7 @@
 - 实现 agent、tool、state、workspace：`01 + 02 + 03 + 05`
 - 只做测试：`03 + 05`
 - 看当前进度和接下来做什么：`04 + 07`
+- 快速找代码入口和热点文件：`07 + 08`
 - 更新文档结构或规则：`06 + 相关主题文档`
 
 ## Source Of Truth
@@ -44,6 +46,7 @@
 | 测试范围、验收标准、完成定义 | [docs/05-testing-and-acceptance.md](./docs/05-testing-and-acceptance.md) |
 | 文档写法、冲突处理、维护流程 | [docs/06-documentation-governance.md](./docs/06-documentation-governance.md) |
 | 当前进度、下一步任务和执行优先级 | [docs/07-roadmap-and-progress.md](./docs/07-roadmap-and-progress.md) |
+| 代码入口、模块位置、任务与文件映射 | [docs/08-codebase-map.md](./docs/08-codebase-map.md) |
 
 ## Working Rules
 
