@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "deerflow-lite"
+version = "0.1.0"
+description = "A local-first agentic RAG MVP with explicit orchestration."
+readme = "readme.md"
+requires-python = ">=3.11"
+dependencies = [
+  "langchain>=1.0.0",
+  "langchain-openai>=1.0.0",
+  "pydantic>=2.7.0",
+  "python-dotenv>=1.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0.0",
+]
+
+[tool.setuptools.packages.find]
+include = ["app*"]

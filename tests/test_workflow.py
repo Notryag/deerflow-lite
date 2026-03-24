@@ -1,0 +1,42 @@
+from __future__ import annotations
+
+import tempfile
+import unittest
+from pathlib import Path
+
+from app.config.settings import Settings
+from app.workflows.run_task import run_task
+
+
+class WorkflowTests(unittest.TestCase):
+    def test_run_task_creates_workspace_notes_and_final_output(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            data_dir = root / "docs"
+            data_dir.mkdir()
+            (data_dir / "notes.md").write_text(
+                "DeerFlow Lite uses explicit orchestration, retrieval, and markdown outputs.",
+                encoding="utf-8",
+            )
+
+            settings = Settings(
+                runtime_dir=root / "runtime",
+                vector_db_dir=root / "vectors",
+                use_stub_agents=True,
+            )
+            state = run_task(
+                user_task="Summarize the docs directory and generate a markdown report",
+                data_dir=str(data_dir),
+                thread_id="thread-demo",
+                settings=settings,
+            )
+
+            workspace = Path(state.workspace_dir or "")
+            self.assertEqual(state.status, "completed")
+            self.assertTrue((workspace / "notes" / "research.md").exists())
+            self.assertTrue((workspace / "outputs" / "final.md").exists())
+            self.assertTrue(bool(state.final_answer))
+
+
+if __name__ == "__main__":
+    unittest.main()
