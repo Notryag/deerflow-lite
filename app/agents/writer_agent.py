@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-from app.agents.common import build_context, extract_evidence, format_context_block, use_stub_agents
+from app.agents.common import build_chat_model, build_context, extract_evidence, format_context_block, use_stub_agents
 from app.config.settings import Settings
 from app.runtime.state import RunState
 from app.runtime.workspace import Workspace
@@ -33,6 +33,8 @@ class WriterAgent:
         output = self._stub_output(state, workspace)
         if not use_stub_agents(self.settings):
             output = self._langchain_output(state, workspace)
+            if not output.sections or ((state.retrieved_docs or state.search_results) and not output.evidence):
+                output = self._stub_output(state, workspace)
         path = workspace.write_text("outputs/final.md", render_final_markdown(output))
         relative = str(path.relative_to(workspace.thread_dir)).replace("\\", "/")
         if relative not in state.output_files:
@@ -58,24 +60,21 @@ class WriterAgent:
 
     def _langchain_output(self, state: RunState, workspace: Workspace) -> WriterOutput:
         from langchain.agents import create_agent
-        from langchain.agents.middleware import wrap_model_call
-        from langchain.messages import SystemMessage
+        from langchain.agents.middleware import dynamic_prompt
 
         context = build_context(state, workspace)
+        base_prompt = (
+            "Write a concise final markdown report. "
+            "Distinguish facts grounded in retrieved material from synthesis."
+        )
 
-        @wrap_model_call
-        def inject_context(request, handler):
-            extra = {"type": "text", "text": format_context_block(context)}
-            system_message = SystemMessage(content=list(request.system_message.content_blocks) + [extra])
-            return handler(request.override(system_message=system_message))
+        @dynamic_prompt
+        def inject_context(request):
+            return f"{base_prompt}\n\n{format_context_block(context)}"
 
         agent = create_agent(
-            model=self.settings.model_name,
+            model=build_chat_model(self.settings),
             tools=[],
-            system_prompt=(
-                "Write a concise final markdown report. "
-                "Distinguish facts grounded in retrieved material from synthesis."
-            ),
             middleware=[inject_context],
             response_format=WriterOutput,
             name="deerflow_lite_writer",

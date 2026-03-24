@@ -3,6 +3,7 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 from app.agents.common import (
+    build_chat_model,
     build_context,
     extract_evidence,
     format_context_block,
@@ -42,6 +43,8 @@ class ResearchAgent:
         notes = self._stub_notes(state)
         if not use_stub_agents(self.settings):
             notes = self._langchain_notes(state, workspace)
+            if (state.retrieved_docs or state.search_results) and not notes.evidence:
+                notes = self._stub_notes(state)
         path = workspace.write_text("notes/research.md", render_research_notes(notes))
         relative = str(path.relative_to(workspace.thread_dir)).replace("\\", "/")
         if relative not in state.notes_files:
@@ -68,24 +71,21 @@ class ResearchAgent:
 
     def _langchain_notes(self, state: RunState, workspace: Workspace) -> ResearchNotes:
         from langchain.agents import create_agent
-        from langchain.agents.middleware import wrap_model_call
-        from langchain.messages import SystemMessage
+        from langchain.agents.middleware import dynamic_prompt
 
         context = build_context(state, workspace)
+        base_prompt = (
+            "Write structured research notes from the available materials. "
+            "Keep findings concise and include open questions for missing information."
+        )
 
-        @wrap_model_call
-        def inject_context(request, handler):
-            extra = {"type": "text", "text": format_context_block(context)}
-            system_message = SystemMessage(content=list(request.system_message.content_blocks) + [extra])
-            return handler(request.override(system_message=system_message))
+        @dynamic_prompt
+        def inject_context(request):
+            return f"{base_prompt}\n\n{format_context_block(context)}"
 
         agent = create_agent(
-            model=self.settings.model_name,
+            model=build_chat_model(self.settings),
             tools=[],
-            system_prompt=(
-                "Write structured research notes from the available materials. "
-                "Keep findings concise and include open questions for missing information."
-            ),
             middleware=[inject_context],
             response_format=ResearchNotes,
             name="deerflow_lite_research",

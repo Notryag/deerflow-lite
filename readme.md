@@ -64,3 +64,4 @@
 - CLI: `python -m app.cli.main run "...task..." --data-dir ./docs`
 - 测试: `python -m unittest discover -s tests -v`
 - 默认行为: 没有模型配置时走本地 stub agents；retrieval 使用本地 deterministic embedding 和 JSON vector store
+- 使用真实模型时，确保 `.env` 中 `USE_STUB_AGENTS=false`
