@@ -11,154 +11,179 @@
 当前仓库状态：
 
 - 文档体系已拆分并建立 source-of-truth 规则
-- CLI MVP 已可运行
+- 文档目标架构已切换到 `Lead Agent + task/subagent`
+- 当前代码仍是旧版固定 `orchestrator -> research -> writer` 流程
+- CLI MVP 仍可运行
 - 本地 retrieval 已可用
 - stub agent 路径可用
 - 真实模型路径已打通
-- 测试已覆盖 workspace、file tools、state、retrieval、orchestrator、workflow
+- 现有测试仍主要覆盖旧版 workflow
 
 当前验证状态：
 
-- `python -m unittest discover -s tests -v` 已通过
-- 真实模型路径已完成冒烟验证
+- `python -m unittest discover -s tests -v` 通过的是旧版流程验证
+- 新目标架构的 runtime 还没有实现，因此还没有对应验证
 
 ## 2. Progress By Track
 
 | Track | Status | Progress | Notes |
 | --- | --- | --- | --- |
 | 文档治理与拆分 | completed | 100% | 已建立 `01` 到 `06` 主规范 |
-| CLI 主流程 | completed | 100% | 可创建 workspace、notes、final output |
+| 目标架构文档对齐 | completed | 100% | 目标已切换到 subagent harness |
+| 旧版 CLI 主流程 | completed | 100% | 仍可创建 workspace 和 final output |
 | 本地 retrieval | completed | 85% | MVP 可用，质量和索引策略仍可加强 |
-| agent 基础能力 | completed | 80% | 结构已稳定，真实模型产出质量仍需优化 |
 | file tools | completed | 90% | 安全校验和测试已具备 |
+| lead agent runtime | pending | 10% | 仅有旧版 orchestrator 作为迁移参考 |
+| task tool / registry | pending | 0% | 尚未开始 |
+| subagent executor | pending | 0% | 尚未开始 |
 | web search | pending | 20% | 当前仍为 stub |
-| python exec | pending | 15% | 已有基础函数，未纳入正式执行分支 |
-| 运行健壮性 | pending | 35% | 需要 timeout、fallback、manifest、失败恢复补强 |
+| python exec | pending | 15% | 已有基础函数，未纳入新架构 |
+| 运行健壮性 | pending | 20% | 新架构的 timeout、manifest、失败恢复尚未实现 |
 | API | deferred | 0% | 不属于当前优先级 |
 
 ## 3. Recommended Next Order
 
 建议按以下顺序继续：
 
-1. 完成真实 `search_web` provider 接入
-2. 完成 `run_python_code` 的受控执行闭环
-3. 补强真实模型路径的健壮性和 fallback
-4. 提升 retrieval 与 writer 的输出质量
-5. 最后再考虑 API
+1. 完成 `RunState`、workspace、manifest 的新 contract 落地
+2. 实现 `lead_agent` 骨架
+3. 实现 `task` 工具与 `subagent registry`
+4. 实现 `subagent executor` 的并发、超时和单层委派保护
+5. 把旧版 research / writer 逻辑迁移成可复用的 subtask prompt 或模板
+6. 再做真实 `search_web` provider 和受控执行能力
+7. 最后再考虑 API
 
 原因：
 
-- `search_web` 和 `python exec` 是当前主流程中最明显的功能缺口
-- 真实模型路径已经跑通，下一步应该把失败处理和质量控制补齐
-- 在 MVP 阶段先补全 CLI 工作链条，比新增 API 更有价值
+- 现阶段最大的缺口不是工具 provider，而是目标架构与当前代码完全不一致
+- 如果先补 `search_web`，后续仍要再做一次 runtime 重构，返工高
+- 先完成 harness 基础层，后续 retrieval、web、shell 才有稳定承载点
 
 ## 4. Task Breakdown
 
-### T1. Real Web Search Provider
+### T1. Harness State And Workspace Refactor
 
 Status: `next`
 
 目标：
 
-- 保留当前 `search_web` contract
-- 接入至少一个真实 provider
-- 在 provider 不可用时自动退回 stub
+- 让 `RunState` 支持 task / result / artifact / trace
+- 为 workspace 增加 `subagents/manifest.json` 约定
+- 保持旧版 CLI 可迁移
 
 子任务：
 
-- 在 `settings` 中加入 provider 相关配置
-- 为 `search_web` 设计 provider adapter 层
-- 实现一个真实 provider
-- 保留 deterministic stub 作为 fallback
-- 为 provider 成功、失败、fallback 写测试
+- 更新 `RunState` 字段
+- 设计 manifest 写入格式
+- 调整 workspace 目录约定
+- 明确旧版字段的兼容或删除策略
+- 为状态和 workspace 变更补测试
 
 完成定义：
 
-- orchestrator 决定需要 web search 时可返回真实结构化结果
-- 无 key 或 provider 出错时不会让主流程崩掉
+- 新状态结构可以支撑 subagent runtime
+- workspace 可以记录 subagent 产物和执行记录
 
-### T2. Controlled Python Execution
+### T2. Lead Agent Skeleton
 
 Status: `next`
 
 目标：
 
-- 让 `run_python_code` 成为正式 workflow 分支
-- 保证执行范围、超时和输出边界可控
+- 用 `lead_agent` 取代固定 orchestrator / research / writer 终态设计
 
 子任务：
 
-- 为 python execution 增加显式开关配置
-- 明确执行目录和允许访问的路径
-- 增加 stdout/stderr 长度限制
-- 把执行结果写入 workspace
-- 为成功、超时、异常写测试
+- 新建 `lead_agent.py`
+- 定义简单任务直答路径
+- 定义最终输出写入路径
+- 保留可迁移的 prompt / fallback 逻辑
 
 完成定义：
 
-- orchestrator 请求 python execution 时 workflow 能受控执行
-- 失败信息能落盘并写回 `RunState.errors`
+- 简单任务在不创建 subagent 的情况下可完成
+- `outputs/final.md` 可由 lead agent 直接生成
 
-### T3. Model Reliability And Fallback
+### T3. Task Tool And Registry
 
 Status: `next`
 
 目标：
 
-- 提高真实模型路径在慢 provider 和坏输出场景下的稳定性
+- 提供稳定的 subagent 创建入口和类型映射
 
 子任务：
 
-- 为 `ChatOpenAI` 增加 timeout 和 retry 配置
-- 明确模型失败时的 fallback 策略
-- 为 structured output 失败增加兜底解析
-- 在日志中记录 agent 级耗时和失败原因
+- 实现 `task` 工具 contract
+- 实现 registry 与类型校验
+- 先落地 `general-purpose`
+- 预留 `bash`
+- 为非法类型、空 prompt、默认值写测试
 
 完成定义：
 
-- provider 变慢或失败时，流程要么降级完成，要么清晰失败
-- 不能出现“命令长时间卡住但没有状态信息”的情况
+- `lead_agent` 能创建并跟踪 subagent task
+- `task` 返回结构化结果
 
-### T4. Retrieval Quality Upgrade
+### T4. Subagent Executor
+
+Status: `next`
+
+目标：
+
+- 实现 subagent 生命周期管理
+
+子任务：
+
+- 实现 executor
+- 增加最大并发限制
+- 增加超时控制
+- 禁止 nested delegation
+- 补充日志和 trace 写入
+
+完成定义：
+
+- 1 到多个 subagent 可被稳定执行
+- 超时和失败有清晰结果
+
+### T5. Legacy Logic Migration
 
 Status: `later`
 
 目标：
 
-- 提高本地检索的命中质量和索引生命周期管理能力
+- 把现有 `research_agent` / `writer_agent` 中能复用的逻辑迁移为模板、prompt 或 helper
 
 子任务：
 
-- 让 collection 命名与 `data_dir` 绑定，而不是只依赖 thread id
-- 处理索引复用与重建策略
-- 增加更多 loader 覆盖和失败提示
-- 为结果增加更稳定的摘要和引用生成
+- 提取 notes / summary 渲染逻辑
+- 识别可复用的 evidence 生成逻辑
+- 清理固定三段式依赖
 
 完成定义：
 
-- 同一数据目录重复执行时不必总是重建索引
-- writer 产出中的 evidence 更稳定
+- 旧版固定角色代码不再是主流程依赖
+- 可复用逻辑被保留而不是丢失
 
-### T5. Output Quality And Artifact Manifest
+### T6. Real Web Search And Controlled Execution
 
 Status: `later`
 
 目标：
 
-- 提高 notes/final 的可读性，并把 run 产物整理成统一 manifest
+- 补全 subagent 在真实工具上的执行能力
 
 子任务：
 
-- 优化 writer 输出模板
-- 统一 notes、final、logs 的引用关系
-- 增加 `artifacts.json` 或类似清单文件
-- 在 CLI 输出中附带更明确的产物摘要
+- 真实 `search_web` provider
+- `run_python_code` 或 shell 执行闭环
+- 为工具失败与 fallback 写测试
 
 完成定义：
 
-- 用户能快速理解一次 run 生成了什么、依据什么生成
+- subagent 使用真实工具时仍可控、可回退
 
-### T6. API Layer
+### T7. API Layer
 
 Status: `deferred`
 
@@ -179,13 +204,13 @@ Status: `deferred`
 
 ## 5. Current Focus Recommendation
 
-如果下一步只做一个主题，优先做 `T1. Real Web Search Provider`。
+如果下一步只做一个主题，优先做 `T1. Harness State And Workspace Refactor`。
 
 理由：
 
-- 它已经在 orchestrator contract 里占位
-- 它能直接补全 research 任务的核心价值链
-- 它比 API 更接近当前产品目标
+- 它是所有后续 subagent 能力的地基
+- 它能把文档中的目标 contract 变成可编码对象
+- 它比先接 provider 更能减少返工
 
 ## 6. Progress Update Rule
 

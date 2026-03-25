@@ -8,29 +8,33 @@
 
 ## 1. Top-Level Architecture
 
-主流程 MUST 是显式编排，而不是黑盒 agent 自动串联。
+主流程 MUST 是显式编排的 `Lead Agent + task/subagent` harness，而不是固定写死的多段式 agent 流水线。
 
 ```text
 User Task
   -> CLI Entry
   -> Run Manager
-  -> Orchestrator
-      -> Retrieval when needed
-      -> Web search when needed
-      -> Python execution when needed
-  -> Research Agent
-  -> Writer Agent
+  -> Lead Agent
+      -> direct answer when task is simple
+      -> task tool when delegation is needed
+          -> Subagent Executor
+              -> Subagent A
+              -> Subagent B
+              -> Subagent C
+      -> aggregate structured subagent results
   -> Persist Outputs
   -> Final Answer
 ```
 
 系统的核心分工必须是：
 
-- agent 负责推理和决策
-- tool 负责外部能力调用
-- workflow 负责流程控制
-- state 负责跨节点共享信息
-- workspace 负责中间产物落盘
+- `lead_agent` 负责规划、委派、综合
+- `task` 工具负责显式创建 subagent
+- `subagent executor` 负责并发、超时、追踪和结果回收
+- 其他 tools 负责外部能力调用
+- `workflow` 负责 run 生命周期
+- `state` 负责跨节点共享信息
+- `workspace` 负责中间产物落盘
 
 ## 2. Required Directory Layout
 
@@ -39,10 +43,14 @@ User Task
 ```text
 app/
   agents/
-    orchestrator.py
-    research_agent.py
-    writer_agent.py
+    lead_agent.py
+    common.py
+  subagents/
+    registry.py
+    executor.py
+    builtins.py
   tools/
+    task_tool.py
     retrieval.py
     web_search.py
     file_ops.py
@@ -71,35 +79,34 @@ tests/
 - `python_exec.py` 可以是 stub，但模块路径应预留
 - `api/` 不在当前强制目录内
 - `schemas/` 只有在实现中有明确独立价值时再引入
+- 当前仓库里的 `orchestrator.py`、`research_agent.py`、`writer_agent.py` 可作为迁移参考，但不是目标终态
 
 ## 3. Runtime Flow
 
-第一版 MUST 用显式流程函数驱动：
+第一版 subagent harness MUST 用显式流程函数驱动：
 
 ```python
 def run_task(user_task: str) -> RunState:
     state = init_state(user_task)
-    state = run_orchestrator(state)
-
-    if state.needs_retrieval:
-        state = run_retrieval(state)
-
-    if state.needs_web_search:
-        state = run_web_search(state)
-
-    if state.needs_python:
-        state = run_python_code_step(state)
-
-    state = run_research_agent(state)
-    state = run_writer_agent(state)
-    state = persist_outputs(state)
+    workspace = create_workspace(state)
+    state = run_lead_agent(state, workspace)
+    state = persist_outputs(state, workspace)
     return state
 ```
+
+其中 `run_lead_agent` 的行为约束是：
+
+- lead agent MAY 直接完成简单任务
+- lead agent MAY 多次调用 `task` 工具
+- `task` 工具 MUST 把请求交给 `subagent executor`
+- executor MUST 返回结构化 subagent 结果
+- lead agent MUST 基于结果完成综合并写出最终产物
 
 以下约束必须满足：
 
 - 节点调用顺序清晰
 - 条件分支由 `RunState` 驱动
+- subagent 创建只能通过 `task` 工具完成
 - 节点之间不依赖隐式 prompt 历史传递关键数据
 - graph-like 可以有，但第一版不得先造复杂 graph engine
 
@@ -110,9 +117,10 @@ def run_task(user_task: str) -> RunState:
 ```text
 runtime/threads/{thread_id}/
   input/
-  notes/
+  workspace/
   outputs/
   logs/
+  subagents/
 ```
 
 ### 4.1 File Convention
@@ -120,41 +128,60 @@ runtime/threads/{thread_id}/
 以下文件约定必须默认存在或由流程生成：
 
 - `input/task.md`
-- `notes/research.md`
 - `outputs/final.md`
 - `logs/run.log`
+- `subagents/manifest.json`
+
+subagent 产生的中间 notes、代码、草稿、分析结果 SHOULD 写入 `workspace/` 或 `subagents/{task_id}/`。
 
 ### 4.2 Workspace Principles
 
 - 所有最终结果 MUST 落盘
 - 关键中间结果 SHOULD 落盘
-- agent 协作 SHOULD 通过结构化 state 和文件完成
+- lead agent 与 subagent SHOULD 通过结构化 state 和文件完成协作
+- subagent 共享同一个 thread workspace
+- subagent 结果必须可以按 `task_id` 回溯
 - workspace 必须可以支持调试和失败恢复
 
 ## 5. Context Injection Strategy
 
-writer 和 orchestrator SHOULD 使用 middleware 注入动态上下文，但必须控制输入量。
+`lead_agent` SHOULD 使用 middleware 注入动态上下文，但必须控制输入量。subagent 的上下文注入规则必须与 lead agent 区分开。
 
-允许注入的内容：
+允许注入到 lead agent 的内容：
 
 - task summary
 - available tools summary
 - workspace file summary
 - retrieval summary
-- research notes summary
+- 已完成 subagent 的摘要结果
 
-不得直接注入的内容：
+允许注入到 subagent 的内容：
 
+- 一条自包含的 task prompt
+- 当前 thread 的必要元数据
+- 共享 workspace / sandbox 访问能力
+
+不得直接注入到 subagent 的内容：
+
+- lead agent 的完整对话历史
+- 其他 subagent 的完整消息历史
 - 整个 workspace 原文
 - 大量无筛选日志
-- 全量检索结果原文
 
 ### 5.1 Context Budget Rules
 
 - 默认只传摘要
 - 长文只传前若干段或压缩摘要
 - retrieval 默认 `top_k = 3`
-- writer 优先读取 notes 摘要，而不是直接消费所有原始材料
+- subagent prompt MUST 自包含，不依赖父消息上下文
+- lead agent 优先读取 subagent 摘要和 artifact 路径，而不是全量原文
+
+### 5.2 Delegation Guardrails
+
+- subagent MUST NOT 再创建 subagent
+- 默认最大并发数 SHOULD 为 `3`
+- 单个 subagent 默认超时 SHOULD 为 `900` 秒
+- 每个 subagent MUST 有显式 `max_turns`
 
 ## 6. Configuration
 
@@ -170,24 +197,28 @@ EMBEDDING_MODEL=
 VECTOR_DB_DIR=.cache/vectorstore
 RUNTIME_DIR=./runtime
 WEB_SEARCH_PROVIDER=stub
+SUBAGENT_MAX_CONCURRENCY=3
+SUBAGENT_TIMEOUT_SECONDS=900
 ```
 
 ## 7. Evolution Path
 
 以下演进顺序必须遵守：
 
-1. 先跑通显式 workflow
-2. 再稳定 state 和 tool contracts
-3. 最后再考虑节点抽象、condition、edge 等图模型
+1. 先用显式 workflow 跑通 `lead_agent + task/subagent executor`
+2. 再稳定 `RunState`、task、subagent contracts
+3. 再补并发保护、artifact manifest、受控执行能力
+4. 最后再考虑更复杂的图模型或 API 入口
 
 当前阶段不得为了未来扩展而提前引入复杂调度框架。
 
 ## 8. Current Reference Implementation Notes
 
-当前参考实现允许以下工程取舍：
+当前参考实现仍保留以下旧版工程取舍：
 
+- 代码里还是固定的 `orchestrator -> research -> writer` 流程
 - retrieval 使用本地 deterministic embedding 和 JSON vector store 作为 MVP 默认实现
 - 没有模型配置时，agent 允许走 stub 路径，但对外 contract 不变
 - web search 当前默认是 stub provider
 
-这些取舍可以在后续替换，但替换时不得破坏 `03-agent-and-tool-contracts.md` 中定义的接口稳定性。
+这些实现细节会被后续 refactor 替换，但替换时不得破坏 `03-agent-and-tool-contracts.md` 中定义的接口稳定性。

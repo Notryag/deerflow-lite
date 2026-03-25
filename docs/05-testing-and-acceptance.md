@@ -8,43 +8,59 @@
 
 ## 1. Testing Principles
 
-测试必须优先覆盖 contract 和主流程。
+测试必须优先覆盖 contract、委派边界和主流程。
 
 原则如下：
 
 - 优先 fake 或 stub 外部依赖
 - 不依赖真实 web search
 - 不依赖真实线上数据库
-- 单测覆盖 contract，集测覆盖链路
+- 单测覆盖 contract，集测覆盖 lead-agent 到 subagent 的链路
 
 ## 2. Required Unit Tests
 
 至少必须覆盖以下单元测试：
 
-- workspace 创建
-- file tools 路径安全校验
-- `RunState` 默认值和更新
+- workspace 创建与路径安全
+- `RunState` 默认值和 task / result 更新
+- subagent registry 配置解析
+- `task` 工具参数校验与结果结构
+- `subagent executor` 的超时与并发保护
+- 单层委派限制是否生效
 - retrieval tool 输出结构
-- orchestrator 决策解析
 
-## 3. Required Integration Test
+## 3. Required Integration Tests
 
-至少必须有一个完整链路集成测试，输入一个简单的 `txt/md` 数据目录，并断言：
+至少必须有以下两类集成测试：
+
+### 3.1 Simple Task Without Delegation
+
+输入一个简单任务，并断言：
 
 - 创建了 workspace
-- 生成了 `notes/research.md`
+- 没有创建 subagent 或只创建了空 manifest
+- 生成了 `outputs/final.md`
+- `final_answer` 非空
+
+### 3.2 Delegated Task With Subagents
+
+输入一个需要拆解的任务，并断言：
+
+- 创建了 workspace
+- 生成了 `subagents/manifest.json`
+- 至少一个 subagent 结果被记录
 - 生成了 `outputs/final.md`
 - `final_answer` 非空
 
 ## 4. Minimum Test Count
 
-当前 MVP 的最低要求是：
+当前目标架构的最低要求是：
 
-- 至少 `5` 个测试通过
+- 至少 `7` 个测试通过
 
 更推荐的下限是：
 
-- `6` 个以上测试，其中至少 `1` 个为集成测试
+- `9` 个以上测试，其中至少 `2` 个为集成测试
 
 ## 5. Acceptance Criteria
 
@@ -52,12 +68,12 @@
 
 1. 能通过 CLI 接收一个任务
 2. 能创建独立 workspace
-3. 能根据任务决定是否检索
-4. retrieval 作为 tool 工作
-5. research agent 能生成 notes
-6. writer agent 能生成 `final.md`
+3. `lead_agent` 能直接完成简单任务
+4. `lead_agent` 能通过 `task` 创建 subagent
+5. subagent 共享 workspace，但上下文隔离
+6. nested subagent 被禁止
 7. 最终结果已落盘
-8. 至少 5 个测试通过
+8. 至少 7 个测试通过
 9. 架构中没有 `langchain_classic`
 10. 核心主流程不是 LCEL chain 拼接
 

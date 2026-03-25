@@ -6,14 +6,25 @@
 - Audience: 实现者、维护者、AI CLI
 - Source of truth for: 当前代码入口、核心模块位置、任务与文件映射
 
+## 0. Architecture Status Note
+
+本文件描述的是“当前代码”而不是“目标架构”。
+
+当前需要同时记住两件事：
+
+- `docs/01-05` 已经把目标定义成 `Lead Agent + task/subagent`
+- 当前代码仍是旧版固定 `orchestrator -> research -> writer` MVP
+
+因此，本文件的作用是帮助你定位迁移起点，而不是证明当前实现已经符合目标架构。
+
 ## 1. How To Read The Codebase
 
 第一次进入代码时，建议按这个顺序看：
 
 1. CLI 入口
-2. 主 workflow
+2. 当前主 workflow
 3. runtime 核心对象
-4. agent 实现
+4. 当前 agent 实现
 5. tools 与 retrieval
 6. 对应测试
 
@@ -55,12 +66,12 @@
 
 - 初始化 `RunState`
 - 创建 workspace
-- 执行 orchestrator
+- 执行旧版 orchestrator
 - 根据 state 触发 retrieval 和 web search
-- 执行 research 和 writer
+- 执行旧版 research 和 writer
 - 写日志并更新 run 状态
 
-这是当前最重要的主流程文件。
+这是当前最重要的迁移起点文件。
 
 ## 3. Runtime Core
 
@@ -112,7 +123,9 @@
 - 为单次 run 创建日志
 - 关闭 handler，避免 Windows 临时目录清理失败
 
-## 4. Agents
+## 4. Current Agents
+
+以下内容描述的是旧版固定角色 agent，不是目标终态。
 
 ### Shared Agent Helpers
 
@@ -142,6 +155,11 @@
 - 决定 `needs_retrieval`、`needs_web_search`、`needs_python`
 - 对真实模型输出做归一化兜底
 
+迁移意义：
+
+- 可作为未来 `lead_agent` 的 planning / fallback 参考
+- 但不能直接等同于目标中的 subagent harness
+
 ### Research Agent
 
 文件：
@@ -152,6 +170,10 @@
 
 - 把 retrieval / web search 结果整理成 `notes/research.md`
 - 在真实模型输出质量不足时回退到本地 stub notes
+
+迁移意义：
+
+- 可提取为未来 subagent prompt 模板或 artifact 渲染逻辑
 
 ### Writer Agent
 
@@ -164,6 +186,10 @@
 - 生成 `outputs/final.md`
 - 写入 `final_answer`
 - 在真实模型输出不可靠时回退到 stub output
+
+迁移意义：
+
+- 可提取为 lead agent 的最终汇总模板
 
 ## 5. Tools
 
@@ -198,7 +224,7 @@
 
 - 当前返回 deterministic stub 结果
 
-这是接下来 `T1` 的主要改造点。
+在新规划里，这会在 harness 基础层完成后再升级。
 
 ### Python Execution Tool
 
@@ -211,7 +237,7 @@
 - 提供基础 python 执行函数
 - 当前尚未接入正式 workflow 分支
 
-这是接下来 `T2` 的主要改造点。
+在新规划里，它会被放到 subagent 工具能力补全阶段。
 
 ## 6. Retrieval Stack
 
@@ -241,32 +267,53 @@
 - [test_file_ops.py](D:/workspace/github/deerflow-lite/tests/test_file_ops.py): file tools 读写与越界
 - [test_state.py](D:/workspace/github/deerflow-lite/tests/test_state.py): `RunState` 默认值
 - [test_retrieval.py](D:/workspace/github/deerflow-lite/tests/test_retrieval.py): retrieval 输出结构
-- [test_orchestrator.py](D:/workspace/github/deerflow-lite/tests/test_orchestrator.py): orchestrator 决策
-- [test_workflow.py](D:/workspace/github/deerflow-lite/tests/test_workflow.py): 端到端主流程
+- [test_orchestrator.py](D:/workspace/github/deerflow-lite/tests/test_orchestrator.py): 旧版 orchestrator 决策
+- [test_workflow.py](D:/workspace/github/deerflow-lite/tests/test_workflow.py): 旧版端到端主流程
 
 ## 8. Hot Files By Task
 
-### 做 `T1. Real Web Search Provider`
+### 做 `T1. Harness State And Workspace Refactor`
 
 优先看：
 
-- [app/tools/web_search.py](D:/workspace/github/deerflow-lite/app/tools/web_search.py)
-- [app/config/settings.py](D:/workspace/github/deerflow-lite/app/config/settings.py)
 - [app/workflows/run_task.py](D:/workspace/github/deerflow-lite/app/workflows/run_task.py)
-- [app/agents/orchestrator.py](D:/workspace/github/deerflow-lite/app/agents/orchestrator.py)
+- [app/runtime/state.py](D:/workspace/github/deerflow-lite/app/runtime/state.py)
+- [app/runtime/workspace.py](D:/workspace/github/deerflow-lite/app/runtime/workspace.py)
+- [app/runtime/logger.py](D:/workspace/github/deerflow-lite/app/runtime/logger.py)
 - [docs/03-agent-and-tool-contracts.md](D:/workspace/github/deerflow-lite/docs/03-agent-and-tool-contracts.md)
 - [docs/07-roadmap-and-progress.md](D:/workspace/github/deerflow-lite/docs/07-roadmap-and-progress.md)
 
-### 做 `T2. Controlled Python Execution`
+### 做 `T2. Lead Agent Skeleton`
 
 优先看：
 
-- [app/tools/python_exec.py](D:/workspace/github/deerflow-lite/app/tools/python_exec.py)
+- [app/agents/orchestrator.py](D:/workspace/github/deerflow-lite/app/agents/orchestrator.py)
+- [app/agents/common.py](D:/workspace/github/deerflow-lite/app/agents/common.py)
 - [app/workflows/run_task.py](D:/workspace/github/deerflow-lite/app/workflows/run_task.py)
-- [app/runtime/workspace.py](D:/workspace/github/deerflow-lite/app/runtime/workspace.py)
 - [app/runtime/state.py](D:/workspace/github/deerflow-lite/app/runtime/state.py)
+- [docs/02-architecture-and-runtime.md](D:/workspace/github/deerflow-lite/docs/02-architecture-and-runtime.md)
 
-### 做 `T3. Model Reliability And Fallback`
+### 做 `T3. Task Tool And Registry`
+
+优先看：
+
+- [app/agents/common.py](D:/workspace/github/deerflow-lite/app/agents/common.py)
+- [app/tools/file_ops.py](D:/workspace/github/deerflow-lite/app/tools/file_ops.py)
+- [app/config/settings.py](D:/workspace/github/deerflow-lite/app/config/settings.py)
+- [docs/03-agent-and-tool-contracts.md](D:/workspace/github/deerflow-lite/docs/03-agent-and-tool-contracts.md)
+- [docs/04-implementation-plan.md](D:/workspace/github/deerflow-lite/docs/04-implementation-plan.md)
+
+### 做 `T4. Subagent Executor`
+
+优先看：
+
+- [app/workflows/run_task.py](D:/workspace/github/deerflow-lite/app/workflows/run_task.py)
+- [app/runtime/logger.py](D:/workspace/github/deerflow-lite/app/runtime/logger.py)
+- [app/runtime/workspace.py](D:/workspace/github/deerflow-lite/app/runtime/workspace.py)
+- [docs/02-architecture-and-runtime.md](D:/workspace/github/deerflow-lite/docs/02-architecture-and-runtime.md)
+- [docs/05-testing-and-acceptance.md](D:/workspace/github/deerflow-lite/docs/05-testing-and-acceptance.md)
+
+### 做 `T5. Legacy Logic Migration`
 
 优先看：
 
@@ -274,15 +321,27 @@
 - [app/agents/orchestrator.py](D:/workspace/github/deerflow-lite/app/agents/orchestrator.py)
 - [app/agents/research_agent.py](D:/workspace/github/deerflow-lite/app/agents/research_agent.py)
 - [app/agents/writer_agent.py](D:/workspace/github/deerflow-lite/app/agents/writer_agent.py)
-- [app/runtime/logger.py](D:/workspace/github/deerflow-lite/app/runtime/logger.py)
+- [docs/07-roadmap-and-progress.md](D:/workspace/github/deerflow-lite/docs/07-roadmap-and-progress.md)
 
-## 9. Fast Orientation Prompt
+## 9. Expected New Files
+
+按目标架构，后续大概率会新增这些文件：
+
+- `app/agents/lead_agent.py`
+- `app/subagents/registry.py`
+- `app/subagents/executor.py`
+- `app/subagents/builtins.py`
+- `app/tools/task_tool.py`
+
+这些文件当前还不存在。新增时，应以 `docs/02`、`docs/03` 为准，而不是沿用旧版角色划分。
+
+## 10. Fast Orientation Prompt
 
 如果新窗口的 AI 需要快速进入状态，可以给它这个提示：
 
 ```text
 先读 README.md，然后读 docs/07-roadmap-and-progress.md 和 docs/08-codebase-map.md。
-如果要改实现，再按代码地图定位入口和热点文件。
+如果要改实现，先区分“目标架构”和“当前代码”，再按代码地图定位入口和热点文件。
 严格遵守 docs/01-06 的 source-of-truth 规则。
 先汇报你理解的当前状态、目标任务、要改的文件，再动手。
 ```
