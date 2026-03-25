@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+from time import sleep
 from pathlib import Path
+from unittest.mock import patch
 
 from app.config.settings import Settings
 from app.runtime.state import RunState
@@ -53,6 +55,34 @@ class SubagentExecutorTests(unittest.TestCase):
 
             with self.assertRaises(ValueError):
                 SubagentExecutor(Settings()).execute_task(state, workspace, task["task_id"])
+
+    def test_execute_task_marks_timeout_when_worker_exceeds_limit(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            workspace = Workspace(Path(tmp), "thread-timeout").create()
+            state = RunState(thread_id="thread-timeout", user_task="delegate this task")
+            tool = TaskTool(state, workspace)
+            task = tool.create_task(
+                description="Slow task",
+                prompt="Take a long time before returning.",
+            )
+            state.subagent_tasks[0]["timeout_seconds"] = 1
+            executor = SubagentExecutor(Settings(subagent_timeout_seconds=1))
+
+            def slow_body(task: dict[str, object], spec_description: str) -> dict[str, str]:
+                sleep(1.2)
+                return {
+                    "artifact_path": f"subagents/{task['task_id']}/result.md",
+                    "artifact_body": "late",
+                    "summary": "late",
+                }
+
+            with patch.object(SubagentExecutor, "_run_task_body", side_effect=slow_body):
+                result = executor.execute_task(state, workspace, task["task_id"])
+
+            self.assertEqual(result["status"], "timeout")
+            self.assertEqual(state.subagent_tasks[0]["status"], "timeout")
+            self.assertEqual(state.subagent_results[0]["status"], "timeout")
+            self.assertFalse((workspace.thread_dir / "subagents" / "task_001" / "result.md").exists())
 
 
 if __name__ == "__main__":

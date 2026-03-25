@@ -212,16 +212,17 @@
 
 职责：
 
-- 执行单个 task
+- 执行单个或多个 task
 - 将 task 从 `pending` 更新为 `completed`
 - 生成 `subagents/{task_id}/result.md`
 - 将结果回填到 `RunState.subagent_results` 和 manifest
+- 在 timeout 时返回结构化 `timeout` 结果
 
 当前限制：
 
-- 只有保守的顺序执行路径
+- 当前并发层基于线程池
 - 已有并发上限检查和 nested delegation 校验
-- 还没有真实并发执行和硬超时中断
+- 还没有真正的执行隔离和可中断 worker
 
 ### Research Agent
 
@@ -332,7 +333,7 @@
 - [test_retrieval.py](D:/workspace/github/deerflow-lite/tests/test_retrieval.py): retrieval 输出结构
 - [test_subagent_registry.py](D:/workspace/github/deerflow-lite/tests/test_subagent_registry.py): registry 类型和 `max_turns` 校验
 - [test_task_tool.py](D:/workspace/github/deerflow-lite/tests/test_task_tool.py): task 创建、manifest 写入、参数校验
-- [test_subagent_executor.py](D:/workspace/github/deerflow-lite/tests/test_subagent_executor.py): executor 执行与 artifact 落盘
+- [test_subagent_executor.py](D:/workspace/github/deerflow-lite/tests/test_subagent_executor.py): executor 执行、timeout、并发上限与 nested delegation 校验
 - [test_orchestrator.py](D:/workspace/github/deerflow-lite/tests/test_orchestrator.py): 旧版 orchestrator 决策
 - [test_workflow.py](D:/workspace/github/deerflow-lite/tests/test_workflow.py): lead-agent 直答、delegation、旧版端到端回退主流程
 
