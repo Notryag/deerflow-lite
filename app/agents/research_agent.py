@@ -49,6 +49,7 @@ class ResearchAgent:
         relative = str(path.relative_to(workspace.thread_dir)).replace("\\", "/")
         if relative not in state.notes_files:
             state.notes_files.append(relative)
+        state.add_artifact_file(relative)
         return state
 
     def _stub_notes(self, state: RunState) -> ResearchNotes:

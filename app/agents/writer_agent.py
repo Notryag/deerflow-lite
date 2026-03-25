@@ -39,6 +39,7 @@ class WriterAgent:
         relative = str(path.relative_to(workspace.thread_dir)).replace("\\", "/")
         if relative not in state.output_files:
             state.output_files.append(relative)
+        state.add_artifact_file(relative)
         state.final_answer = output.final_answer
         return state
 

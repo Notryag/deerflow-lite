@@ -18,6 +18,7 @@ def init_state(user_task: str, data_dir: str | None, thread_id: str | None = Non
         thread_id=thread_id or uuid4().hex[:12],
         user_task=user_task,
         data_dir=data_dir,
+        trace_id=uuid4().hex,
         status="pending",
     )
 
@@ -32,6 +33,7 @@ def run_task(
     state = init_state(user_task=user_task, data_dir=data_dir, thread_id=thread_id)
     workspace = Workspace(settings.runtime_dir, state.thread_id).create()
     state.workspace_dir = str(workspace.thread_dir)
+    state.add_artifact_file("subagents/manifest.json")
 
     logger = get_run_logger(workspace.logs_dir / "run.log")
     state.status = "running"

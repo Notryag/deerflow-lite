@@ -33,8 +33,13 @@ class WorkflowTests(unittest.TestCase):
 
             workspace = Path(state.workspace_dir or "")
             self.assertEqual(state.status, "completed")
+            self.assertTrue(bool(state.trace_id))
             self.assertTrue((workspace / "notes" / "research.md").exists())
             self.assertTrue((workspace / "outputs" / "final.md").exists())
+            self.assertTrue((workspace / "subagents" / "manifest.json").exists())
+            self.assertIn("subagents/manifest.json", state.artifact_files)
+            self.assertIn("notes/research.md", state.artifact_files)
+            self.assertIn("outputs/final.md", state.artifact_files)
             self.assertTrue(bool(state.final_answer))
 
 
