@@ -13,7 +13,7 @@
 当前需要同时记住两件事：
 
 - `docs/01-05` 已经把目标定义成 `Lead Agent + task/subagent`
-- 当前代码仍是旧版固定 `orchestrator -> research -> writer` MVP
+- 当前代码已经有了 `lead_agent`、`task tool`、`subagent registry`、最小 `executor`，但复杂任务仍会回退到旧版 `orchestrator -> research -> writer`
 
 因此，本文件的作用是帮助你定位迁移起点，而不是证明当前实现已经符合目标架构。
 
@@ -34,11 +34,11 @@
 2. [app/workflows/run_task.py](D:/workspace/github/deerflow-lite/app/workflows/run_task.py)
 3. [app/runtime/state.py](D:/workspace/github/deerflow-lite/app/runtime/state.py)
 4. [app/runtime/workspace.py](D:/workspace/github/deerflow-lite/app/runtime/workspace.py)
-5. [app/agents/orchestrator.py](D:/workspace/github/deerflow-lite/app/agents/orchestrator.py)
-6. [app/agents/research_agent.py](D:/workspace/github/deerflow-lite/app/agents/research_agent.py)
-7. [app/agents/writer_agent.py](D:/workspace/github/deerflow-lite/app/agents/writer_agent.py)
-8. [app/tools/retrieval.py](D:/workspace/github/deerflow-lite/app/tools/retrieval.py)
-9. [app/tools/web_search.py](D:/workspace/github/deerflow-lite/app/tools/web_search.py)
+5. [app/agents/lead_agent.py](D:/workspace/github/deerflow-lite/app/agents/lead_agent.py)
+6. [app/tools/task_tool.py](D:/workspace/github/deerflow-lite/app/tools/task_tool.py)
+7. [app/subagents/registry.py](D:/workspace/github/deerflow-lite/app/subagents/registry.py)
+8. [app/subagents/executor.py](D:/workspace/github/deerflow-lite/app/subagents/executor.py)
+9. [app/agents/orchestrator.py](D:/workspace/github/deerflow-lite/app/agents/orchestrator.py)
 10. [tests/test_workflow.py](D:/workspace/github/deerflow-lite/tests/test_workflow.py)
 
 ## 2. Code Entry Points
@@ -66,7 +66,9 @@
 
 - 初始化 `RunState`
 - 创建 workspace
-- 执行旧版 orchestrator
+- 优先执行 `lead_agent`
+- 在匹配 delegation 时创建 task 并调用最小 `subagent executor`
+- 对复杂任务回退到旧版 orchestrator
 - 根据 state 触发 retrieval 和 web search
 - 执行旧版 research 和 writer
 - 写日志并更新 run 状态
@@ -123,9 +125,26 @@
 - 为单次 run 创建日志
 - 关闭 handler，避免 Windows 临时目录清理失败
 
-## 4. Current Agents
+## 4. Current Agents And Delegation Components
 
-以下内容描述的是旧版固定角色 agent，不是目标终态。
+以下内容同时包含新架构组件和旧版固定角色 agent。
+
+### Lead Agent
+
+文件：
+
+- [app/agents/lead_agent.py](D:/workspace/github/deerflow-lite/app/agents/lead_agent.py)
+
+职责：
+
+- 处理简单任务直答
+- 在特定任务上创建 delegation task
+- 汇总单个 delegated result 并写出 `outputs/final.md`
+
+当前限制：
+
+- 只支持较保守的 delegation 触发条件
+- 复杂任务仍会回退旧版 workflow
 
 ### Shared Agent Helpers
 
@@ -159,6 +178,48 @@
 
 - 可作为未来 `lead_agent` 的 planning / fallback 参考
 - 但不能直接等同于目标中的 subagent harness
+
+### Task Tool
+
+文件：
+
+- [app/tools/task_tool.py](D:/workspace/github/deerflow-lite/app/tools/task_tool.py)
+
+职责：
+
+- 校验 `description`、`prompt`、`subagent_type`、`max_turns`
+- 将 task 记录到 `RunState.subagent_tasks`
+- 将 task 写入 `subagents/manifest.json`
+
+### Subagent Registry
+
+文件：
+
+- [app/subagents/registry.py](D:/workspace/github/deerflow-lite/app/subagents/registry.py)
+
+职责：
+
+- 维护内置 `subagent_type`
+- 校验类型是否合法
+- 控制每种类型的 `max_turns` 和工具集
+
+### Subagent Executor
+
+文件：
+
+- [app/subagents/executor.py](D:/workspace/github/deerflow-lite/app/subagents/executor.py)
+
+职责：
+
+- 执行单个 task
+- 将 task 从 `pending` 更新为 `completed`
+- 生成 `subagents/{task_id}/result.md`
+- 将结果回填到 `RunState.subagent_results` 和 manifest
+
+当前限制：
+
+- 只有单任务执行路径
+- 还没有并发、超时和 nested delegation 护栏
 
 ### Research Agent
 
@@ -267,8 +328,11 @@
 - [test_file_ops.py](D:/workspace/github/deerflow-lite/tests/test_file_ops.py): file tools 读写与越界
 - [test_state.py](D:/workspace/github/deerflow-lite/tests/test_state.py): `RunState` 默认值
 - [test_retrieval.py](D:/workspace/github/deerflow-lite/tests/test_retrieval.py): retrieval 输出结构
+- [test_subagent_registry.py](D:/workspace/github/deerflow-lite/tests/test_subagent_registry.py): registry 类型和 `max_turns` 校验
+- [test_task_tool.py](D:/workspace/github/deerflow-lite/tests/test_task_tool.py): task 创建、manifest 写入、参数校验
+- [test_subagent_executor.py](D:/workspace/github/deerflow-lite/tests/test_subagent_executor.py): executor 执行与 artifact 落盘
 - [test_orchestrator.py](D:/workspace/github/deerflow-lite/tests/test_orchestrator.py): 旧版 orchestrator 决策
-- [test_workflow.py](D:/workspace/github/deerflow-lite/tests/test_workflow.py): 旧版端到端主流程
+- [test_workflow.py](D:/workspace/github/deerflow-lite/tests/test_workflow.py): lead-agent 直答、delegation、旧版端到端回退主流程
 
 ## 8. Hot Files By Task
 
@@ -287,7 +351,7 @@
 
 优先看：
 
-- [app/agents/orchestrator.py](D:/workspace/github/deerflow-lite/app/agents/orchestrator.py)
+- [app/agents/lead_agent.py](D:/workspace/github/deerflow-lite/app/agents/lead_agent.py)
 - [app/agents/common.py](D:/workspace/github/deerflow-lite/app/agents/common.py)
 - [app/workflows/run_task.py](D:/workspace/github/deerflow-lite/app/workflows/run_task.py)
 - [app/runtime/state.py](D:/workspace/github/deerflow-lite/app/runtime/state.py)
@@ -297,8 +361,8 @@
 
 优先看：
 
-- [app/agents/common.py](D:/workspace/github/deerflow-lite/app/agents/common.py)
-- [app/tools/file_ops.py](D:/workspace/github/deerflow-lite/app/tools/file_ops.py)
+- [app/tools/task_tool.py](D:/workspace/github/deerflow-lite/app/tools/task_tool.py)
+- [app/subagents/registry.py](D:/workspace/github/deerflow-lite/app/subagents/registry.py)
 - [app/config/settings.py](D:/workspace/github/deerflow-lite/app/config/settings.py)
 - [docs/03-agent-and-tool-contracts.md](D:/workspace/github/deerflow-lite/docs/03-agent-and-tool-contracts.md)
 - [docs/04-implementation-plan.md](D:/workspace/github/deerflow-lite/docs/04-implementation-plan.md)
@@ -307,6 +371,8 @@
 
 优先看：
 
+- [app/subagents/executor.py](D:/workspace/github/deerflow-lite/app/subagents/executor.py)
+- [app/agents/lead_agent.py](D:/workspace/github/deerflow-lite/app/agents/lead_agent.py)
 - [app/workflows/run_task.py](D:/workspace/github/deerflow-lite/app/workflows/run_task.py)
 - [app/runtime/logger.py](D:/workspace/github/deerflow-lite/app/runtime/logger.py)
 - [app/runtime/workspace.py](D:/workspace/github/deerflow-lite/app/runtime/workspace.py)
@@ -323,17 +389,13 @@
 - [app/agents/writer_agent.py](D:/workspace/github/deerflow-lite/app/agents/writer_agent.py)
 - [docs/07-roadmap-and-progress.md](D:/workspace/github/deerflow-lite/docs/07-roadmap-and-progress.md)
 
-## 9. Expected New Files
+## 9. Expected Remaining New Files
 
-按目标架构，后续大概率会新增这些文件：
+按目标架构，后续大概率还会新增这些文件：
 
-- `app/agents/lead_agent.py`
-- `app/subagents/registry.py`
-- `app/subagents/executor.py`
 - `app/subagents/builtins.py`
-- `app/tools/task_tool.py`
 
-这些文件当前还不存在。新增时，应以 `docs/02`、`docs/03` 为准，而不是沿用旧版角色划分。
+这些文件当前仍不存在。新增时，应以 `docs/02`、`docs/03` 为准，而不是沿用旧版角色划分。
 
 ## 10. Fast Orientation Prompt
 

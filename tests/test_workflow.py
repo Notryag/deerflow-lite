@@ -33,6 +33,31 @@ class WorkflowTests(unittest.TestCase):
             self.assertIn("outputs/final.md", state.artifact_files)
             self.assertTrue(bool(state.final_answer))
 
+    def test_run_task_allows_lead_agent_delegation_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            settings = Settings(
+                runtime_dir=root / "runtime",
+                vector_db_dir=root / "vectors",
+                use_stub_agents=True,
+            )
+            state = run_task(
+                user_task="Delegate this task and inspect the workspace before answering.",
+                thread_id="thread-delegate",
+                settings=settings,
+            )
+
+            workspace = Path(state.workspace_dir or "")
+            self.assertEqual(state.status, "completed")
+            self.assertEqual(state.task_type, "delegated_response")
+            self.assertEqual(len(state.subagent_tasks), 1)
+            self.assertEqual(len(state.subagent_results), 1)
+            self.assertTrue((workspace / "subagents" / "task_001" / "result.md").exists())
+            self.assertTrue((workspace / "outputs" / "final.md").exists())
+            self.assertFalse((workspace / "notes" / "research.md").exists())
+            self.assertIn("subagents/task_001/result.md", state.artifact_files)
+            self.assertTrue(bool(state.final_answer))
+
     def test_run_task_creates_workspace_notes_and_final_output(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

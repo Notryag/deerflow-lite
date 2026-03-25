@@ -43,9 +43,9 @@ def run_task(
 
     try:
         state = LeadAgent(settings).run(state, workspace)
-        if state.task_type == "direct_response" and state.final_answer:
+        if state.task_type in {"direct_response", "delegated_response"} and state.final_answer:
             state.status = "completed"
-            logger.info("lead agent completed without delegation")
+            logger.info("lead agent completed before legacy workflow")
             return state
 
         state = OrchestratorAgent(settings).run(state, workspace)
