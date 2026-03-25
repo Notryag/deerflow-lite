@@ -4,13 +4,12 @@ from uuid import uuid4
 
 from app.agents.lead_agent import LeadAgent
 from app.agents.orchestrator import OrchestratorAgent
-from app.agents.research_agent import ResearchAgent
-from app.agents.writer_agent import WriterAgent
 from app.config.settings import Settings
 from app.runtime.logger import close_run_logger, get_run_logger
 from app.runtime.state import RunState
 from app.runtime.workspace import Workspace
 from app.tools.retrieval import retrieve_knowledge
+from app.tools.reporting import write_final_report, write_research_notes
 from app.tools.web_search import search_web
 
 
@@ -67,8 +66,8 @@ def run_task(
         if state.needs_python:
             logger.info("python execution requested but not enabled in workflow")
 
-        state = ResearchAgent(settings).run(state, workspace)
-        state = WriterAgent(settings).run(state, workspace)
+        write_research_notes(state, workspace)
+        write_final_report(state, workspace)
         state.status = "completed"
         logger.info("run completed")
         return state

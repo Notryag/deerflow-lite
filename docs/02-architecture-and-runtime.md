@@ -31,10 +31,20 @@ User Task
 - `lead_agent` 负责规划、委派、综合
 - `task` 工具负责显式创建 subagent
 - `subagent executor` 负责并发、超时、追踪和结果回收
-- 其他 tools 负责外部能力调用
+- 其他 tools 负责所有具体能力调用
 - `workflow` 负责 run 生命周期
 - `state` 负责跨节点共享信息
 - `workspace` 负责中间产物落盘
+
+这里的“具体能力”包括但不限于：
+
+- retrieval
+- web search
+- file operations
+- shell / python execution
+- research notes / final report 产出
+
+固定 `ResearchAgent` / `WriterAgent` 这类角色 MAY 在迁移期作为参考实现保留，但 MUST NOT 作为目标架构中的长期能力承载点。
 
 ## 2. Required Directory Layout
 
@@ -51,6 +61,7 @@ app/
     builtins.py
   tools/
     task_tool.py
+    reporting.py
     retrieval.py
     web_search.py
     file_ops.py
@@ -80,6 +91,7 @@ tests/
 - `api/` 不在当前强制目录内
 - `schemas/` 只有在实现中有明确独立价值时再引入
 - 当前仓库里的 `orchestrator.py`、`research_agent.py`、`writer_agent.py` 可作为迁移参考，但不是目标终态
+- `reporting.py` 是将 research / report 能力收敛到 tool 层的迁移方向
 
 ## 3. Runtime Flow
 
@@ -219,7 +231,8 @@ SUBAGENT_TIMEOUT_SECONDS=900
 
 当前参考实现仍保留以下旧版工程取舍：
 
-- 代码里还是固定的 `orchestrator -> research -> writer` 流程
+- 代码里仍保留 `orchestrator` 作为复杂任务 fallback 的 planning 节点
+- 复杂任务的 research / report 产出已经开始改走 tool/helper，而不是固定 `research -> writer` agent 节点
 - retrieval 使用本地 deterministic embedding 和 JSON vector store 作为 MVP 默认实现
 - 没有模型配置时，agent 允许走 stub 路径，但对外 contract 不变
 - stub 路径允许使用少量 deterministic heuristics 作为 fallback，但这不是目标中的委派决策机制

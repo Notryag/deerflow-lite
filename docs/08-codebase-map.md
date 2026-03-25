@@ -13,8 +13,8 @@
 当前需要同时记住两件事：
 
 - `docs/01-05` 已经把目标定义成 `Lead Agent + task/subagent`
-- 当前代码已经有了 `lead_agent`、`task tool`、`subagent registry`、最小 `executor`，但复杂任务仍会回退到旧版 `orchestrator -> research -> writer`
-- `T5` 的迁移重点是把 `research` / `writer` 中的 notes、summary、evidence、markdown 渲染逻辑抽成共享 helper，让 legacy agent 和 subagent runtime 复用同一层产出代码
+- 当前代码已经有了 `lead_agent`、`task tool`、`subagent registry`、最小 `executor`，复杂任务仍会回退到 `orchestrator`，但 research / report 产出已开始走 tool/helper
+- `T5` 的迁移重点是把 `research` / `writer` 中的 notes、summary、evidence、markdown 渲染逻辑抽成共享 helper 和 reporting tool，让 legacy agent 和 subagent runtime 复用同一层产出代码
 
 因此，本文件的作用是帮助你定位迁移起点，而不是证明当前实现已经符合目标架构。
 
@@ -40,8 +40,9 @@
 7. [app/subagents/registry.py](D:/workspace/github/deerflow-lite/app/subagents/registry.py)
 8. [app/subagents/rendering.py](D:/workspace/github/deerflow-lite/app/subagents/rendering.py)
 9. [app/subagents/builtins.py](D:/workspace/github/deerflow-lite/app/subagents/builtins.py)
-10. [app/subagents/executor.py](D:/workspace/github/deerflow-lite/app/subagents/executor.py)
-11. [tests/test_workflow.py](D:/workspace/github/deerflow-lite/tests/test_workflow.py)
+10. [app/tools/reporting.py](D:/workspace/github/deerflow-lite/app/tools/reporting.py)
+11. [app/subagents/executor.py](D:/workspace/github/deerflow-lite/app/subagents/executor.py)
+12. [tests/test_workflow.py](D:/workspace/github/deerflow-lite/tests/test_workflow.py)
 
 ## 2. Code Entry Points
 
@@ -72,7 +73,7 @@
 - 在匹配 delegation 时创建 task 并调用最小 `subagent executor`
 - 对复杂任务回退到旧版 orchestrator
 - 根据 state 触发 retrieval 和 web search
-- 执行旧版 research 和 writer
+- 调用 reporting tool 写出 `notes/research.md` 和 `outputs/final.md`
 - 写日志并更新 run 状态
 
 这是当前最重要的迁移起点文件。
@@ -266,6 +267,7 @@
 
 - 可提取为共享 research helper
 - 可与 built-in worker 复用同一套 notes / evidence / markdown 逻辑
+- 当前更接近 legacy reference，不应再作为主 workflow 的长期能力节点
 
 ### Writer Agent
 
@@ -283,6 +285,7 @@
 
 - 可提取为共享 report helper
 - 可与 lead agent 和 built-in worker 复用同一套 final report 逻辑
+- 当前更接近 legacy reference，不应再作为主 workflow 的长期能力节点
 
 ## 5. Tools
 
@@ -332,6 +335,20 @@
 
 在新规划里，它会被放到 subagent 工具能力补全阶段。
 
+### Reporting Tool
+
+文件：
+
+- [app/tools/reporting.py](D:/workspace/github/deerflow-lite/app/tools/reporting.py)
+
+职责：
+
+- 用共享 helper 生成 `notes/research.md`
+- 用共享 helper 生成 `outputs/final.md`
+- 更新 `RunState.notes_files`、`RunState.output_files`、`RunState.artifact_files`
+
+这是把固定 `ResearchAgent` / `WriterAgent` 产出能力下沉到 tool 层的第一步。
+
 ## 6. Retrieval Stack
 
 文件：
@@ -364,6 +381,8 @@
 - [test_task_tool.py](D:/workspace/github/deerflow-lite/tests/test_task_tool.py): task 创建、manifest 写入、参数校验
 - [test_subagent_executor.py](D:/workspace/github/deerflow-lite/tests/test_subagent_executor.py): executor 执行、批量执行、timeout、并发上限与 nested delegation 校验
 - [test_orchestrator.py](D:/workspace/github/deerflow-lite/tests/test_orchestrator.py): 旧版 orchestrator 决策
+- [test_reporting_tool.py](D:/workspace/github/deerflow-lite/tests/test_reporting_tool.py): reporting tool 落盘与 state 更新
+- [test_reporting_helpers.py](D:/workspace/github/deerflow-lite/tests/test_reporting_helpers.py): 共享 prompt、markdown renderer 与 subagent artifact contract
 - [test_workflow.py](D:/workspace/github/deerflow-lite/tests/test_workflow.py): lead-agent 直答、delegation、旧版端到端回退主流程
 
 ## 8. Hot Files By Task
@@ -422,6 +441,7 @@
 - [app/agents/writer_agent.py](D:/workspace/github/deerflow-lite/app/agents/writer_agent.py)
 - [app/subagents/builtins.py](D:/workspace/github/deerflow-lite/app/subagents/builtins.py)
 - [app/subagents/rendering.py](D:/workspace/github/deerflow-lite/app/subagents/rendering.py)
+- [app/tools/reporting.py](D:/workspace/github/deerflow-lite/app/tools/reporting.py)
 - [docs/07-roadmap-and-progress.md](D:/workspace/github/deerflow-lite/docs/07-roadmap-and-progress.md)
 
 ## 9. Expected Remaining New Files

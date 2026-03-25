@@ -20,8 +20,9 @@
 - `subagent executor` 已补上批量并发上限检查和 nested delegation contract 校验
 - `subagent executor` 已补上线程池调度加子进程 worker、timeout 结果回填
 - `app/subagents/builtins.py` 已作为内置 worker 实现落地
-- 当前代码对复杂任务仍保留旧版 `orchestrator -> research -> writer` 回退流程
+- 当前代码对复杂任务仍保留 `orchestrator` fallback，但 research / report 产出已开始改走 `app/tools/reporting.py`
 - `app/subagents/rendering.py` 已落地第一版共享 helper 层，research / report 产出逻辑开始同时服务 legacy agent 和 subagent runtime
+- `app/tools/reporting.py` 已承接 fallback workflow 的 notes / final report 产出
 - CLI MVP 仍可运行
 - 本地 retrieval 已可用
 - stub agent 路径可用
@@ -31,8 +32,8 @@
 当前验证状态：
 
 - `python -m unittest discover -s tests -v` 已通过
-- 当前共有 `27` 个测试通过
-- 新架构已具备 `T1` 到 `T4` 的更完整验证，`T5` 也已经完成第一轮共享 helper 抽取与回归
+- 当前共有 `32` 个测试通过
+- 新架构已具备 `T1` 到 `T4` 的更完整验证，`T5` 已进入“tool 化 fallback 产出”的第二轮迁移
 
 ## 2. Progress By Track
 
@@ -48,7 +49,7 @@
 | lead agent runtime | in_progress | 60% | 真实模型路径已切到 tool-calling delegation，stub 路径仍有 fallback heuristics |
 | task tool / registry | completed | 100% | registry、task tool、lead-agent wiring 已打通 |
 | subagent executor | in_progress | 85% | 已有线程池调度、子进程 worker、timeout 终止、并发上限检查、nested delegation 校验 |
-| legacy logic migration | in_progress | 55% | `rendering.py` 已抽出 research / report 共享 helper，legacy agent 和 built-in worker 已开始复用 |
+| legacy logic migration | in_progress | 75% | `rendering.py` 与 `reporting.py` 已接住共享 helper 和 fallback 产出，主缺口变成移除固定 legacy agent 依赖 |
 | web search | pending | 20% | 当前仍为 stub |
 | python exec | pending | 15% | 已有基础函数，未纳入新架构 |
 | 运行健壮性 | pending | 20% | 新架构的 timeout、manifest、失败恢复尚未实现 |
@@ -58,7 +59,7 @@
 
 建议按以下顺序继续：
 
-1. 继续把旧版 research / writer 的 prompt 模板和汇总逻辑迁到共享层
+1. 从 workflow 中彻底移除固定 legacy agent 依赖，让复杂任务直接落到 `general-purpose` / `bash` subagent
 2. 再做真实 `search_web` provider 和受控执行能力
 3. 为 subagent 增加更真实的 worker 能力和工具接入
 4. 最后再考虑 API
@@ -205,6 +206,7 @@ Status: `in_progress`
 - 提取 evidence 归一化和 markdown 渲染逻辑
 - 让 built-in worker 复用相同的 report helper
 - 继续提取 prompt 模板和最终汇总逻辑
+- 用 tool / helper 替换 workflow 中剩余的固定 `ResearchAgent` / `WriterAgent` 依赖
 - 清理固定三段式依赖
 
 完成定义：
@@ -216,9 +218,11 @@ Status: `in_progress`
 当前结果：
 
 - 已新增 `app/subagents/rendering.py`
+- 已新增 `app/tools/reporting.py`
 - `research_agent` 与 `writer_agent` 已改为复用共享 helper
 - `builtins.py` 已改为复用共享 subagent summary / artifact 渲染逻辑
-- 共享层目前主要覆盖数据形状、summary 和 markdown 渲染；prompt 模板仍在 legacy agent 内
+- `run_task` 的 fallback research / final report 产出已改走 `reporting.py`
+- 共享层目前已覆盖数据形状、summary、markdown 渲染和 prompt 模板；主缺口是彻底移除固定 legacy agent 角色
 
 ### T6. Real Web Search And Controlled Execution
 
@@ -264,8 +268,8 @@ Status: `deferred`
 理由：
 
 - delegation 主链已经打通，executor 也已经具备基础可控性
-- 第一轮共享 helper 已经落地，下一步最有价值的是继续收拢 prompt 模板和汇总逻辑
-- 这样后续接真实 tool/provider 时，legacy workflow 和 subagent runtime 都能沿用同一套输出 contract
+- prompt 模板和 fallback 产出已经开始 tool 化，下一步最有价值的是直接去掉固定 legacy agent 依赖
+- 这样后续接真实 tool/provider 时，workflow 和 subagent runtime 都能沿用同一套输出 contract
 - 先统一产出层，再扩工具层，能减少后续重构次数
 
 ## 6. Progress Update Rule
