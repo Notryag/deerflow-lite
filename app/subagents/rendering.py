@@ -4,9 +4,27 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from app.agents.common import extract_evidence, normalize_bullets
+from app.agents.common import AgentContext, extract_evidence, format_context_block, normalize_bullets
 from app.runtime.state import RunState
 from app.runtime.workspace import Workspace
+
+RESEARCH_BASE_PROMPT = (
+    "Write structured research notes from the available materials. "
+    "Keep findings concise and include open questions for missing information."
+)
+
+WRITER_BASE_PROMPT = (
+    "Write a concise final markdown report. "
+    "Distinguish facts grounded in retrieved material from synthesis."
+)
+
+LEAD_BASE_PROMPT = (
+    "You are the DeerFlow Lite lead agent. "
+    "Decide whether to answer directly or delegate by calling the task tool. "
+    "Use the task tool for complex, multi-step work that benefits from isolated context. "
+    "Do not delegate simple single-step requests. "
+    "After any tool use, produce a concise final answer."
+)
 
 
 class ResearchNotes(BaseModel):
@@ -44,6 +62,22 @@ def render_final_markdown(output: WriterOutput) -> str:
         f"## Report\n{body}\n\n"
         f"## Evidence\n{evidence}\n"
     )
+
+
+def build_prompt_with_context(base_prompt: str, context: AgentContext) -> str:
+    return f"{base_prompt}\n\n{format_context_block(context)}"
+
+
+def build_research_prompt(context: AgentContext) -> str:
+    return build_prompt_with_context(RESEARCH_BASE_PROMPT, context)
+
+
+def build_writer_prompt(context: AgentContext) -> str:
+    return build_prompt_with_context(WRITER_BASE_PROMPT, context)
+
+
+def build_lead_prompt(context: AgentContext) -> str:
+    return build_prompt_with_context(LEAD_BASE_PROMPT, context)
 
 
 def build_research_notes_from_state(state: RunState) -> ResearchNotes:
@@ -89,6 +123,23 @@ def build_subagent_summary(task: dict[str, Any], spec_name: str) -> str:
     if len(prompt) > 160:
         prompt_excerpt += "..."
     return f"{spec_name} worker completed delegated task '{description}'. Prompt focus: {prompt_excerpt}"
+
+
+def build_delegated_final_answer() -> str:
+    return "Completed the task via a delegated subagent."
+
+
+def build_delegated_final_sections(
+    user_task: str,
+    task_id: str,
+    subagent_type: str,
+    result_summary: str,
+) -> list[str]:
+    return [
+        f"### Task\n{user_task}",
+        f"### Delegation\nCreated subagent task `{task_id}` of type `{subagent_type}`.",
+        f"### Result\n{result_summary}",
+    ]
 
 
 def render_subagent_result_markdown(

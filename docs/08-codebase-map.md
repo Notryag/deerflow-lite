@@ -38,9 +38,10 @@
 5. [app/agents/lead_agent.py](D:/workspace/github/deerflow-lite/app/agents/lead_agent.py)
 6. [app/tools/task_tool.py](D:/workspace/github/deerflow-lite/app/tools/task_tool.py)
 7. [app/subagents/registry.py](D:/workspace/github/deerflow-lite/app/subagents/registry.py)
-8. [app/subagents/builtins.py](D:/workspace/github/deerflow-lite/app/subagents/builtins.py)
-9. [app/subagents/executor.py](D:/workspace/github/deerflow-lite/app/subagents/executor.py)
-10. [tests/test_workflow.py](D:/workspace/github/deerflow-lite/tests/test_workflow.py)
+8. [app/subagents/rendering.py](D:/workspace/github/deerflow-lite/app/subagents/rendering.py)
+9. [app/subagents/builtins.py](D:/workspace/github/deerflow-lite/app/subagents/builtins.py)
+10. [app/subagents/executor.py](D:/workspace/github/deerflow-lite/app/subagents/executor.py)
+11. [tests/test_workflow.py](D:/workspace/github/deerflow-lite/tests/test_workflow.py)
 
 ## 2. Code Entry Points
 
@@ -233,9 +234,22 @@
 
 职责：
 
-- 提供内置 worker 的摘要生成和 artifact 渲染逻辑
+- 复用共享渲染 helper 生成内置 worker 的摘要和 artifact
 - 作为子进程 worker 的入口函数
 - 支持测试用的可控延时
+
+### Shared Rendering Helpers
+
+文件：
+
+- [app/subagents/rendering.py](D:/workspace/github/deerflow-lite/app/subagents/rendering.py)
+
+职责：
+
+- 定义共享的 `ResearchNotes` 和 `WriterOutput`
+- 生成 research / final report markdown
+- 从 `RunState` 构造 stub notes / output
+- 生成 built-in worker 复用的 summary 和 artifact markdown
 
 ### Research Agent
 
@@ -407,15 +421,16 @@
 - [app/agents/research_agent.py](D:/workspace/github/deerflow-lite/app/agents/research_agent.py)
 - [app/agents/writer_agent.py](D:/workspace/github/deerflow-lite/app/agents/writer_agent.py)
 - [app/subagents/builtins.py](D:/workspace/github/deerflow-lite/app/subagents/builtins.py)
+- [app/subagents/rendering.py](D:/workspace/github/deerflow-lite/app/subagents/rendering.py)
 - [docs/07-roadmap-and-progress.md](D:/workspace/github/deerflow-lite/docs/07-roadmap-and-progress.md)
 
 ## 9. Expected Remaining New Files
 
-按目标架构，后续大概率还会新增这些文件：
+按目标架构，后续大概率还会新增新的 subagent runtime / provider 文件，但共享渲染层已经先落在：
 
-- `app/subagents/reporting.py`
+- [app/subagents/rendering.py](D:/workspace/github/deerflow-lite/app/subagents/rendering.py)
 
-这个文件当前仍不存在。新增时，应以 `docs/02`、`docs/03` 为准，而不是沿用旧版角色划分。
+后续新增文件时，应以 `docs/02`、`docs/03` 为准，而不是沿用旧版角色划分。
 
 ## 10. Fast Orientation Prompt
 

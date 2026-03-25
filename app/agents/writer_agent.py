@@ -1,10 +1,15 @@
 from __future__ import annotations
 
-from app.agents.common import build_chat_model, build_context, format_context_block, use_stub_agents
+from app.agents.common import build_chat_model, build_context, use_stub_agents
 from app.config.settings import Settings
 from app.runtime.state import RunState
 from app.runtime.workspace import Workspace
-from app.subagents.rendering import WriterOutput, build_writer_output_from_state, render_final_markdown
+from app.subagents.rendering import (
+    WriterOutput,
+    build_writer_output_from_state,
+    build_writer_prompt,
+    render_final_markdown,
+)
 
 
 class WriterAgent:
@@ -33,14 +38,10 @@ class WriterAgent:
         from langchain.agents.middleware import dynamic_prompt
 
         context = build_context(state, workspace)
-        base_prompt = (
-            "Write a concise final markdown report. "
-            "Distinguish facts grounded in retrieved material from synthesis."
-        )
 
         @dynamic_prompt
         def inject_context(request):
-            return f"{base_prompt}\n\n{format_context_block(context)}"
+            return build_writer_prompt(context)
 
         agent = create_agent(
             model=build_chat_model(self.settings),

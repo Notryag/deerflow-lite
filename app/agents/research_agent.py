@@ -1,10 +1,15 @@
 from __future__ import annotations
 
-from app.agents.common import build_chat_model, build_context, format_context_block, use_stub_agents
+from app.agents.common import build_chat_model, build_context, use_stub_agents
 from app.config.settings import Settings
 from app.runtime.state import RunState
 from app.runtime.workspace import Workspace
-from app.subagents.rendering import ResearchNotes, build_research_notes_from_state, render_research_notes
+from app.subagents.rendering import (
+    ResearchNotes,
+    build_research_notes_from_state,
+    build_research_prompt,
+    render_research_notes,
+)
 
 
 class ResearchAgent:
@@ -32,14 +37,10 @@ class ResearchAgent:
         from langchain.agents.middleware import dynamic_prompt
 
         context = build_context(state, workspace)
-        base_prompt = (
-            "Write structured research notes from the available materials. "
-            "Keep findings concise and include open questions for missing information."
-        )
 
         @dynamic_prompt
         def inject_context(request):
-            return f"{base_prompt}\n\n{format_context_block(context)}"
+            return build_research_prompt(context)
 
         agent = create_agent(
             model=build_chat_model(self.settings),

@@ -6,11 +6,16 @@ from typing import Literal
 from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 
-from app.agents.common import build_chat_model, build_context, format_context_block, use_stub_agents
+from app.agents.common import build_chat_model, build_context, use_stub_agents
 from app.config.settings import Settings
 from app.runtime.state import RunState
 from app.runtime.workspace import Workspace
 from app.subagents.executor import SubagentExecutor
+from app.subagents.rendering import (
+    build_delegated_final_answer,
+    build_delegated_final_sections,
+    build_lead_prompt,
+)
 from app.tools.task_tool import TaskTool
 
 
@@ -123,12 +128,13 @@ class LeadAgent:
         result = SubagentExecutor(self.settings).execute_task(state, workspace, task_result["task_id"])
 
         output = LeadAgentOutput(
-            final_answer="Completed the task via a delegated subagent.",
-            sections=[
-                f"### Task\n{state.user_task}",
-                f"### Delegation\nCreated subagent task `{task_result['task_id']}` of type `{task_result['subagent_type']}`.",
-                f"### Result\n{result['summary']}",
-            ],
+            final_answer=build_delegated_final_answer(),
+            sections=build_delegated_final_sections(
+                state.user_task,
+                str(task_result["task_id"]),
+                str(task_result["subagent_type"]),
+                str(result["summary"]),
+            ),
         )
         path = workspace.write_text("outputs/final.md", render_lead_markdown(output))
         relative = str(path.relative_to(workspace.thread_dir)).replace("\\", "/")
@@ -183,19 +189,12 @@ class LeadAgent:
         from langchain.agents.middleware import dynamic_prompt
 
         context = build_context(state, workspace)
-        base_prompt = (
-            "You are the DeerFlow Lite lead agent. "
-            "Decide whether to answer directly or delegate by calling the task tool. "
-            "Use the task tool for complex, multi-step work that benefits from isolated context. "
-            "Do not delegate simple single-step requests. "
-            "After any tool use, produce a concise final answer."
-        )
 
         task_tool = self._build_task_tool(state, workspace)
 
         @dynamic_prompt
         def inject_context(request):
-            return f"{base_prompt}\n\n{format_context_block(context)}"
+            return build_lead_prompt(context)
 
         agent = create_agent(
             model=build_chat_model(self.settings),

@@ -3,7 +3,11 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
+from app.agents.research_agent import ResearchAgent
+from app.agents.writer_agent import WriterAgent
+from app.config.settings import Settings
 from app.runtime.state import RunState
 from app.runtime.workspace import Workspace
 from app.subagents.builtins import run_builtin_subagent
@@ -12,12 +16,91 @@ from app.subagents.rendering import (
     WriterOutput,
     build_research_notes_from_state,
     build_writer_output_from_state,
+    build_subagent_summary,
     render_final_markdown,
     render_research_notes,
+    render_subagent_result_markdown,
 )
 
 
 class ReportingHelpersTests(unittest.TestCase):
+    def test_research_agent_langchain_prompt_uses_shared_instruction_block(self) -> None:
+        captured: dict[str, object] = {}
+
+        class FakeAgent:
+            def invoke(self, payload):
+                captured["payload"] = payload
+                return {
+                    "structured_response": {
+                        "user_task": "Summarize the docs directory.",
+                        "key_findings": ["Shared prompt templates are in use."],
+                        "evidence": [],
+                        "open_questions": [],
+                    }
+                }
+
+        def fake_create_agent(**kwargs):
+            captured["kwargs"] = kwargs
+            return FakeAgent()
+
+        with tempfile.TemporaryDirectory() as tmp:
+            workspace = Workspace(Path(tmp), "thread-research-prompt").create()
+            state = RunState(thread_id="thread-research-prompt", user_task="Summarize the docs directory.")
+            agent = ResearchAgent(Settings(openai_api_key="test-key"))
+
+            with patch("langchain.agents.create_agent", side_effect=fake_create_agent), patch(
+                "langchain.agents.middleware.dynamic_prompt",
+                side_effect=lambda func: func,
+            ):
+                notes = agent._langchain_notes(state, workspace)
+
+        middleware = captured["kwargs"]["middleware"]
+        prompt = middleware[0](None)
+
+        self.assertIsInstance(notes, ResearchNotes)
+        self.assertIn("Write structured research notes from the available materials.", prompt)
+        self.assertIn("Keep findings concise and include open questions for missing information.", prompt)
+        self.assertIn("Runtime context:", prompt)
+        self.assertEqual(captured["payload"], {"messages": [{"role": "user", "content": state.user_task}]})
+
+    def test_writer_agent_langchain_prompt_uses_shared_instruction_block(self) -> None:
+        captured: dict[str, object] = {}
+
+        class FakeAgent:
+            def invoke(self, payload):
+                captured["payload"] = payload
+                return {
+                    "structured_response": {
+                        "final_answer": "Generated a concise report.",
+                        "sections": ["### Summary\nThe task was completed."],
+                        "evidence": [],
+                    }
+                }
+
+        def fake_create_agent(**kwargs):
+            captured["kwargs"] = kwargs
+            return FakeAgent()
+
+        with tempfile.TemporaryDirectory() as tmp:
+            workspace = Workspace(Path(tmp), "thread-writer-prompt").create()
+            state = RunState(thread_id="thread-writer-prompt", user_task="Write the final report.")
+            agent = WriterAgent(Settings(openai_api_key="test-key"))
+
+            with patch("langchain.agents.create_agent", side_effect=fake_create_agent), patch(
+                "langchain.agents.middleware.dynamic_prompt",
+                side_effect=lambda func: func,
+            ):
+                output = agent._langchain_output(state, workspace)
+
+        middleware = captured["kwargs"]["middleware"]
+        prompt = middleware[0](None)
+
+        self.assertIsInstance(output, WriterOutput)
+        self.assertIn("Write a concise final markdown report.", prompt)
+        self.assertIn("Distinguish facts grounded in retrieved material from synthesis.", prompt)
+        self.assertIn("Runtime context:", prompt)
+        self.assertEqual(captured["payload"], {"messages": [{"role": "user", "content": state.user_task}]})
+
     def test_research_builder_uses_state_evidence_and_default_open_question(self) -> None:
         state = RunState(
             thread_id="thread-reporting",
@@ -110,6 +193,24 @@ class ReportingHelpersTests(unittest.TestCase):
         self.assertIn("General-purpose reasoning worker", result["artifact_body"])
         self.assertIn("Prompt focus:", result["artifact_body"])
         self.assertIn("migration plan", result["summary"])
+
+    def test_shared_subagent_summary_and_artifact_renderer_are_consistent(self) -> None:
+        task = {
+            "task_id": "task_456",
+            "description": "Inspect docs",
+            "prompt": "Read the workspace, identify the relevant files, and summarize the migration plan.",
+            "subagent_type": "general-purpose",
+        }
+
+        summary = build_subagent_summary(task, "general-purpose")
+        artifact = render_subagent_result_markdown(task, "general-purpose", "General-purpose reasoning worker", summary)
+
+        self.assertIn("general-purpose worker completed delegated task 'Inspect docs'.", summary)
+        self.assertIn("Prompt focus:", summary)
+        self.assertIn("task_456", artifact)
+        self.assertIn("General-purpose reasoning worker", artifact)
+        self.assertIn("Prompt", artifact)
+        self.assertIn(summary, artifact)
 
 
 if __name__ == "__main__":
