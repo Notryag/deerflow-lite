@@ -1,28 +1,10 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
-
-from app.agents.common import build_chat_model, build_context, extract_evidence, format_context_block, use_stub_agents
+from app.agents.common import build_chat_model, build_context, format_context_block, use_stub_agents
 from app.config.settings import Settings
 from app.runtime.state import RunState
 from app.runtime.workspace import Workspace
-
-
-class WriterOutput(BaseModel):
-    final_answer: str
-    sections: list[str] = Field(default_factory=list)
-    evidence: list[str] = Field(default_factory=list)
-
-
-def render_final_markdown(output: WriterOutput) -> str:
-    body = "\n\n".join(output.sections) if output.sections else "No report body was generated."
-    evidence = "\n".join(f"- {item}" for item in output.evidence) or "- No cited evidence."
-    return (
-        "# Final Report\n\n"
-        f"## Summary\n{output.final_answer}\n\n"
-        f"## Report\n{body}\n\n"
-        f"## Evidence\n{evidence}\n"
-    )
+from app.subagents.rendering import WriterOutput, build_writer_output_from_state, render_final_markdown
 
 
 class WriterAgent:
@@ -44,20 +26,7 @@ class WriterAgent:
         return state
 
     def _stub_output(self, state: RunState, workspace: Workspace) -> WriterOutput:
-        notes_excerpt = ""
-        if state.notes_files:
-            notes_excerpt = workspace.read_text(state.notes_files[0])[:500].strip()
-        sections = [
-            "### Workflow\nThis run used an explicit orchestrator, file-backed workspace, and structured state transitions.",
-            f"### Task\n{state.user_task}",
-        ]
-        if notes_excerpt:
-            sections.append(f"### Notes digest\n{notes_excerpt}")
-        evidence = extract_evidence(state.retrieved_docs) + extract_evidence(state.search_results)
-        summary = "Generated a markdown report from the available task context and collected notes."
-        if state.retrieved_docs:
-            summary = "Generated a markdown report using retrieved local context and structured research notes."
-        return WriterOutput(final_answer=summary, sections=sections, evidence=evidence)
+        return build_writer_output_from_state(state, workspace)
 
     def _langchain_output(self, state: RunState, workspace: Workspace) -> WriterOutput:
         from langchain.agents import create_agent

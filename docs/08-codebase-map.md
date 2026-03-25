@@ -14,6 +14,7 @@
 
 - `docs/01-05` 已经把目标定义成 `Lead Agent + task/subagent`
 - 当前代码已经有了 `lead_agent`、`task tool`、`subagent registry`、最小 `executor`，但复杂任务仍会回退到旧版 `orchestrator -> research -> writer`
+- `T5` 的迁移重点是把 `research` / `writer` 中的 notes、summary、evidence、markdown 渲染逻辑抽成共享 helper，让 legacy agent 和 subagent runtime 复用同一层产出代码
 
 因此，本文件的作用是帮助你定位迁移起点，而不是证明当前实现已经符合目标架构。
 
@@ -249,7 +250,8 @@
 
 迁移意义：
 
-- 可提取为未来 subagent prompt 模板或 artifact 渲染逻辑
+- 可提取为共享 research helper
+- 可与 built-in worker 复用同一套 notes / evidence / markdown 逻辑
 
 ### Writer Agent
 
@@ -265,7 +267,8 @@
 
 迁移意义：
 
-- 可提取为 lead agent 的最终汇总模板
+- 可提取为共享 report helper
+- 可与 lead agent 和 built-in worker 复用同一套 final report 逻辑
 
 ## 5. Tools
 
@@ -403,15 +406,16 @@
 - [app/agents/orchestrator.py](D:/workspace/github/deerflow-lite/app/agents/orchestrator.py)
 - [app/agents/research_agent.py](D:/workspace/github/deerflow-lite/app/agents/research_agent.py)
 - [app/agents/writer_agent.py](D:/workspace/github/deerflow-lite/app/agents/writer_agent.py)
+- [app/subagents/builtins.py](D:/workspace/github/deerflow-lite/app/subagents/builtins.py)
 - [docs/07-roadmap-and-progress.md](D:/workspace/github/deerflow-lite/docs/07-roadmap-and-progress.md)
 
 ## 9. Expected Remaining New Files
 
 按目标架构，后续大概率还会新增这些文件：
 
-- `app/subagents/builtins.py`
+- `app/subagents/reporting.py`
 
-这些文件当前仍不存在。新增时，应以 `docs/02`、`docs/03` 为准，而不是沿用旧版角色划分。
+这个文件当前仍不存在。新增时，应以 `docs/02`、`docs/03` 为准，而不是沿用旧版角色划分。
 
 ## 10. Fast Orientation Prompt
 

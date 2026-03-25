@@ -149,6 +149,18 @@ subagent MUST：
 - `general-purpose`: 默认分析型 subagent，可使用除 `task` 外的常规工具
 - `bash`: 偏 shell / coding 的 subagent，工具集必须比通用 subagent 更严格
 
+### 5.4 Shared Helper Layer
+
+research / report 相关的渲染逻辑 SHOULD 被抽成共享 helper，而不是散落在 legacy agent 和 subagent worker 里。
+
+最小约束如下：
+
+- helper SHOULD 接受可序列化的 state 摘要、notes 对象或结果对象
+- helper SHOULD 负责 markdown 渲染、evidence 归一化和 summary 拼接
+- helper MUST 保持纯函数风格，不能依赖 workflow 生命周期或 prompt 历史
+- legacy `research_agent`、`writer_agent` 和 built-in subagent worker MAY 复用同一组 helper
+- helper 输出 SHOULD 能直接写入 artifact 文件或 `RunState`
+
 ## 6. Subagent Registry Contract
 
 registry MUST 提供稳定的类型到配置映射。

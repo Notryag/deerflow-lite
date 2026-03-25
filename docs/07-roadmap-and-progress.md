@@ -21,6 +21,7 @@
 - `subagent executor` 已补上线程池调度加子进程 worker、timeout 结果回填
 - `app/subagents/builtins.py` 已作为内置 worker 实现落地
 - 当前代码对复杂任务仍保留旧版 `orchestrator -> research -> writer` 回退流程
+- `T5` 已提升为当前优先的共享 helper 迁移主题，目标是让 research / report 产出逻辑同时服务 legacy agent 和 subagent runtime
 - CLI MVP 仍可运行
 - 本地 retrieval 已可用
 - stub agent 路径可用
@@ -47,6 +48,7 @@
 | lead agent runtime | in_progress | 60% | 真实模型路径已切到 tool-calling delegation，stub 路径仍有 fallback heuristics |
 | task tool / registry | completed | 100% | registry、task tool、lead-agent wiring 已打通 |
 | subagent executor | in_progress | 85% | 已有线程池调度、子进程 worker、timeout 终止、并发上限检查、nested delegation 校验 |
+| legacy logic migration | next | 15% | 正在抽取 research / report 共享 helper，供 legacy agent 和 subagent runtime 复用 |
 | web search | pending | 20% | 当前仍为 stub |
 | python exec | pending | 15% | 已有基础函数，未纳入新架构 |
 | 运行健壮性 | pending | 20% | 新架构的 timeout、manifest、失败恢复尚未实现 |
@@ -56,9 +58,9 @@
 
 建议按以下顺序继续：
 
-1. 把旧版 research / writer 逻辑迁移成可复用的 subtask prompt 或模板
-2. 再做真实 `search_web` provider 和受控执行能力
-3. 为 subagent 增加更真实的 worker 能力和工具接入
+1. 把旧版 research / writer 逻辑迁移成共享 helper 层
+2. 让 built-in worker 直接复用同一套 research / report 渲染逻辑
+3. 再做真实 `search_web` provider 和受控执行能力
 4. 最后再考虑 API
 
 原因：
@@ -190,21 +192,24 @@ Status: `in_progress`
 
 ### T5. Legacy Logic Migration
 
-Status: `later`
+Status: `next`
 
 目标：
 
-- 把现有 `research_agent` / `writer_agent` 中能复用的逻辑迁移为模板、prompt 或 helper
+- 把现有 `research_agent` / `writer_agent` 中能复用的逻辑迁移为共享 helper
+- 让 research / report 渲染逻辑同时服务 legacy agent 和 subagent runtime
 
 子任务：
 
 - 提取 notes / summary 渲染逻辑
-- 识别可复用的 evidence 生成逻辑
+- 提取 evidence 归一化和 markdown 渲染逻辑
+- 让 built-in worker 复用相同的 report helper
 - 清理固定三段式依赖
 
 完成定义：
 
-- 旧版固定角色代码不再是主流程依赖
+- 旧版固定角色代码不再独占 report / research 渲染逻辑
+- legacy agent 和 subagent runtime 复用同一组 helper
 - 可复用逻辑被保留而不是丢失
 
 ### T6. Real Web Search And Controlled Execution
@@ -251,8 +256,9 @@ Status: `deferred`
 理由：
 
 - delegation 主链已经打通，executor 也已经具备基础可控性
-- 下一步最有价值的是把旧版 research / writer 的产出逻辑迁进 subagent runtime
-- 这样后续接真实 tool/provider 才不会继续堆在 legacy workflow 上
+- 下一步最有价值的是把旧版 research / writer 的产出逻辑抽成共享 helper
+- 这样后续接真实 tool/provider 时，legacy workflow 和 subagent runtime 都能直接复用
+- 先统一产出层，再扩工具层，能减少后续重构次数
 
 ## 6. Progress Update Rule
 

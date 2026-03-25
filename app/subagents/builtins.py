@@ -4,27 +4,7 @@ from queue import Empty
 from time import sleep
 from typing import Any
 
-
-def build_summary(task: dict[str, Any], spec_name: str) -> str:
-    description = str(task.get("description", "")).strip()
-    prompt = str(task.get("prompt", "")).strip()
-    prompt_excerpt = prompt[:160].strip()
-    if len(prompt) > 160:
-        prompt_excerpt += "..."
-    return f"{spec_name} worker completed delegated task '{description}'. Prompt focus: {prompt_excerpt}"
-
-
-def render_artifact(task: dict[str, Any], spec_name: str, spec_description: str, summary: str) -> str:
-    return (
-        "# Subagent Result\n\n"
-        f"## Task ID\n{task['task_id']}\n\n"
-        f"## Description\n{task['description']}\n\n"
-        f"## Subagent Type\n{task['subagent_type']}\n\n"
-        f"## Type Notes\n{spec_description}\n\n"
-        f"## Worker\n{spec_name}\n\n"
-        f"## Prompt\n{task['prompt']}\n\n"
-        f"## Summary\n{summary}\n"
-    )
+from app.subagents.rendering import build_subagent_summary, render_subagent_result_markdown
 
 
 def run_builtin_subagent(task: dict[str, Any], spec_name: str, spec_description: str) -> dict[str, str]:
@@ -33,8 +13,8 @@ def run_builtin_subagent(task: dict[str, Any], spec_name: str, spec_description:
         sleep(simulated_delay)
 
     artifact_path = f"subagents/{task['task_id']}/result.md"
-    summary = build_summary(task, spec_name)
-    artifact_body = render_artifact(task, spec_name, spec_description, summary)
+    summary = build_subagent_summary(task, spec_name)
+    artifact_body = render_subagent_result_markdown(task, spec_name, spec_description, summary)
     return {
         "artifact_path": artifact_path,
         "artifact_body": artifact_body,
