@@ -18,7 +18,8 @@
 - `lead_agent` 在真实模型路径下已改为通过 `task` tool-calling 决定是否委派
 - stub 路径仍保留少量 heuristics 作为 fallback
 - `subagent executor` 已补上批量并发上限检查和 nested delegation contract 校验
-- `subagent executor` 已补上线程池批量执行和 timeout 结果回填
+- `subagent executor` 已补上线程池调度加子进程 worker、timeout 结果回填
+- `app/subagents/builtins.py` 已作为内置 worker 实现落地
 - 当前代码对复杂任务仍保留旧版 `orchestrator -> research -> writer` 回退流程
 - CLI MVP 仍可运行
 - 本地 retrieval 已可用
@@ -29,8 +30,8 @@
 当前验证状态：
 
 - `python -m unittest discover -s tests -v` 已通过
-- 当前共有 `21` 个测试通过
-- 新架构已具备 `T1` 到 `T4` 的更完整验证，但 `executor` 仍缺真正的执行隔离和可中断 worker
+- 当前共有 `22` 个测试通过
+- 新架构已具备 `T1` 到 `T4` 的更完整验证，executor 已具备基础执行隔离和 timeout 终止能力
 
 ## 2. Progress By Track
 
@@ -45,7 +46,7 @@
 | file tools | completed | 90% | 安全校验和测试已具备 |
 | lead agent runtime | in_progress | 60% | 真实模型路径已切到 tool-calling delegation，stub 路径仍有 fallback heuristics |
 | task tool / registry | completed | 100% | registry、task tool、lead-agent wiring 已打通 |
-| subagent executor | in_progress | 75% | 已有线程池批量执行、并发上限检查、timeout 结果回填、nested delegation 校验 |
+| subagent executor | in_progress | 85% | 已有线程池调度、子进程 worker、timeout 终止、并发上限检查、nested delegation 校验 |
 | web search | pending | 20% | 当前仍为 stub |
 | python exec | pending | 15% | 已有基础函数，未纳入新架构 |
 | 运行健壮性 | pending | 20% | 新架构的 timeout、manifest、失败恢复尚未实现 |
@@ -55,15 +56,16 @@
 
 建议按以下顺序继续：
 
-1. 为 `subagent executor` 补真正的执行隔离和可中断 worker
-2. 把旧版 research / writer 逻辑迁移成可复用的 subtask prompt 或模板
-3. 再做真实 `search_web` provider 和受控执行能力
+1. 把旧版 research / writer 逻辑迁移成可复用的 subtask prompt 或模板
+2. 再做真实 `search_web` provider 和受控执行能力
+3. 为 subagent 增加更真实的 worker 能力和工具接入
 4. 最后再考虑 API
 
 原因：
 
 - `T1`、`T2`、`T3` 已经把状态、lead-agent、task contract 串起来
-- 当前 delegation 主链已经可跑，剩下的是 executor 级的执行隔离、可中断性和更真实的 worker 能力
+- 当前 delegation 主链已经可跑，executor 也已经有基础隔离和 timeout 终止
+- 剩下的核心缺口变成更真实的 worker 能力、工具接入和旧逻辑迁移
 - 在 delegation 主链完成前继续补 provider，收益仍然有限
 
 ## 4. Task Breakdown
@@ -177,12 +179,14 @@ Status: `in_progress`
 当前结果：
 
 - 已新增 `app/subagents/executor.py`
-- executor 已能执行单个 task、回填 task/result 状态并写入 `subagents/{task_id}/result.md`
-- executor 已有线程池批量执行
+- 已新增 `app/subagents/builtins.py`
+- executor 已能执行单个或多个 task、回填 task/result 状态并写入 `subagents/{task_id}/result.md`
+- executor 已有线程池调度
+- executor 已有子进程 worker 隔离
 - executor 已有批量并发上限检查
 - executor 已有 timeout 结果回填
 - executor 已显式拒绝 nested delegation contract
-- 真正的执行隔离和可中断 worker 仍未完成，因此本主题仍处于进行中
+- 更真实的 worker 能力和工具接入仍未完成，因此本主题仍处于进行中
 
 ### T5. Legacy Logic Migration
 
@@ -242,13 +246,13 @@ Status: `deferred`
 
 ## 5. Current Focus Recommendation
 
-如果下一步只做一个主题，优先做 `T4. Subagent Executor`。
+如果下一步只做一个主题，优先做 `T5. Legacy Logic Migration`。
 
 理由：
 
-- delegation 主链已经打通，接下来最关键的是把 executor 从“可跑”补到“可控”
-- 真正的执行隔离、可中断 worker 和更真实的 subagent runtime 会决定这套架构能不能稳定扩展
-- 在 executor 护栏没补完前，继续增加更多 tool/provider 的收益有限
+- delegation 主链已经打通，executor 也已经具备基础可控性
+- 下一步最有价值的是把旧版 research / writer 的产出逻辑迁进 subagent runtime
+- 这样后续接真实 tool/provider 才不会继续堆在 legacy workflow 上
 
 ## 6. Progress Update Rule
 

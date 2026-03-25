@@ -2,9 +2,7 @@ from __future__ import annotations
 
 import tempfile
 import unittest
-from time import sleep
 from pathlib import Path
-from unittest.mock import patch
 
 from app.config.settings import Settings
 from app.runtime.state import RunState
@@ -66,23 +64,33 @@ class SubagentExecutorTests(unittest.TestCase):
                 prompt="Take a long time before returning.",
             )
             state.subagent_tasks[0]["timeout_seconds"] = 1
+            state.subagent_tasks[0]["simulated_delay_seconds"] = 1.2
             executor = SubagentExecutor(Settings(subagent_timeout_seconds=1))
-
-            def slow_body(task: dict[str, object], spec_description: str) -> dict[str, str]:
-                sleep(1.2)
-                return {
-                    "artifact_path": f"subagents/{task['task_id']}/result.md",
-                    "artifact_body": "late",
-                    "summary": "late",
-                }
-
-            with patch.object(SubagentExecutor, "_run_task_body", side_effect=slow_body):
-                result = executor.execute_task(state, workspace, task["task_id"])
+            result = executor.execute_task(state, workspace, task["task_id"])
 
             self.assertEqual(result["status"], "timeout")
             self.assertEqual(state.subagent_tasks[0]["status"], "timeout")
             self.assertEqual(state.subagent_results[0]["status"], "timeout")
             self.assertFalse((workspace.thread_dir / "subagents" / "task_001" / "result.md").exists())
+
+    def test_execute_tasks_completes_multiple_tasks_in_batch(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            workspace = Workspace(Path(tmp), "thread-multi").create()
+            state = RunState(thread_id="thread-multi", user_task="delegate multiple tasks")
+            tool = TaskTool(state, workspace)
+            first = tool.create_task(description="Task one", prompt="Do one thing.")
+            second = tool.create_task(description="Task two", prompt="Do another thing.")
+
+            results = SubagentExecutor(Settings(subagent_max_concurrency=2)).execute_tasks(
+                state,
+                workspace,
+                [first["task_id"], second["task_id"]],
+            )
+
+            self.assertEqual(len(results), 2)
+            self.assertEqual({item["status"] for item in results}, {"completed"})
+            self.assertTrue((workspace.thread_dir / "subagents" / "task_001" / "result.md").exists())
+            self.assertTrue((workspace.thread_dir / "subagents" / "task_002" / "result.md").exists())
 
 
 if __name__ == "__main__":

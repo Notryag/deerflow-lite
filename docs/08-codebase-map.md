@@ -37,8 +37,8 @@
 5. [app/agents/lead_agent.py](D:/workspace/github/deerflow-lite/app/agents/lead_agent.py)
 6. [app/tools/task_tool.py](D:/workspace/github/deerflow-lite/app/tools/task_tool.py)
 7. [app/subagents/registry.py](D:/workspace/github/deerflow-lite/app/subagents/registry.py)
-8. [app/subagents/executor.py](D:/workspace/github/deerflow-lite/app/subagents/executor.py)
-9. [app/agents/orchestrator.py](D:/workspace/github/deerflow-lite/app/agents/orchestrator.py)
+8. [app/subagents/builtins.py](D:/workspace/github/deerflow-lite/app/subagents/builtins.py)
+9. [app/subagents/executor.py](D:/workspace/github/deerflow-lite/app/subagents/executor.py)
 10. [tests/test_workflow.py](D:/workspace/github/deerflow-lite/tests/test_workflow.py)
 
 ## 2. Code Entry Points
@@ -220,9 +220,21 @@
 
 当前限制：
 
-- 当前并发层基于线程池
+- 当前并发层是“线程池调度 + 子进程 worker”
 - 已有并发上限检查和 nested delegation 校验
-- 还没有真正的执行隔离和可中断 worker
+- 当前只有内置 worker，尚未接入更真实的 subagent 工具运行时
+
+### Built-In Workers
+
+文件：
+
+- [app/subagents/builtins.py](D:/workspace/github/deerflow-lite/app/subagents/builtins.py)
+
+职责：
+
+- 提供内置 worker 的摘要生成和 artifact 渲染逻辑
+- 作为子进程 worker 的入口函数
+- 支持测试用的可控延时
 
 ### Research Agent
 
@@ -333,7 +345,7 @@
 - [test_retrieval.py](D:/workspace/github/deerflow-lite/tests/test_retrieval.py): retrieval 输出结构
 - [test_subagent_registry.py](D:/workspace/github/deerflow-lite/tests/test_subagent_registry.py): registry 类型和 `max_turns` 校验
 - [test_task_tool.py](D:/workspace/github/deerflow-lite/tests/test_task_tool.py): task 创建、manifest 写入、参数校验
-- [test_subagent_executor.py](D:/workspace/github/deerflow-lite/tests/test_subagent_executor.py): executor 执行、timeout、并发上限与 nested delegation 校验
+- [test_subagent_executor.py](D:/workspace/github/deerflow-lite/tests/test_subagent_executor.py): executor 执行、批量执行、timeout、并发上限与 nested delegation 校验
 - [test_orchestrator.py](D:/workspace/github/deerflow-lite/tests/test_orchestrator.py): 旧版 orchestrator 决策
 - [test_workflow.py](D:/workspace/github/deerflow-lite/tests/test_workflow.py): lead-agent 直答、delegation、旧版端到端回退主流程
 
@@ -374,6 +386,7 @@
 
 优先看：
 
+- [app/subagents/builtins.py](D:/workspace/github/deerflow-lite/app/subagents/builtins.py)
 - [app/subagents/executor.py](D:/workspace/github/deerflow-lite/app/subagents/executor.py)
 - [app/agents/lead_agent.py](D:/workspace/github/deerflow-lite/app/agents/lead_agent.py)
 - [app/workflows/run_task.py](D:/workspace/github/deerflow-lite/app/workflows/run_task.py)
