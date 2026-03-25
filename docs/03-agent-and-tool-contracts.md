@@ -66,7 +66,7 @@ class RunState(BaseModel):
 
 - 理解任务意图
 - 生成简短 plan
-- 判断是否需要委派
+- 在真实模型路径下，通过 tool-calling 判断是否需要委派
 - 在需要时构造自包含的 subagent task prompt
 - 汇总 subagent 结果和 workspace 产物
 - 产出最终对用户可读的回答
@@ -78,6 +78,7 @@ class RunState(BaseModel):
 - `lead_agent` MUST 通过 `task` 工具发起 subagent
 - `lead_agent` MUST 记录 plan、subagent 调用和最终输出
 - `lead_agent` 必须区分“来自工具或 artifact 的事实”和“模型综合结论”
+- Python 侧 MAY 提供 stub fallback，但 MUST NOT 把 heuristics 当作真实模型路径中的主决策机制
 
 ## 4. Task Tool Contract
 

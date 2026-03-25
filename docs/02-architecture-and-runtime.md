@@ -96,6 +96,7 @@ def run_task(user_task: str) -> RunState:
 
 其中 `run_lead_agent` 的行为约束是：
 
+- 在真实模型路径下，lead agent SHOULD 由 LLM 自己决定是否调用 `task` 工具
 - lead agent MAY 直接完成简单任务
 - lead agent MAY 多次调用 `task` 工具
 - `task` 工具 MUST 把请求交给 `subagent executor`
@@ -146,6 +147,8 @@ subagent 产生的中间 notes、代码、草稿、分析结果 SHOULD 写入 `w
 ## 5. Context Injection Strategy
 
 `lead_agent` SHOULD 使用 middleware 注入动态上下文，但必须控制输入量。subagent 的上下文注入规则必须与 lead agent 区分开。
+
+真实模型路径中，是否委派给 subagent SHOULD 由 lead agent 在 tool-calling 过程中决定，而不是由 Python 侧 heuristics 预先硬编码。
 
 允许注入到 lead agent 的内容：
 
@@ -219,6 +222,7 @@ SUBAGENT_TIMEOUT_SECONDS=900
 - 代码里还是固定的 `orchestrator -> research -> writer` 流程
 - retrieval 使用本地 deterministic embedding 和 JSON vector store 作为 MVP 默认实现
 - 没有模型配置时，agent 允许走 stub 路径，但对外 contract 不变
+- stub 路径允许使用少量 deterministic heuristics 作为 fallback，但这不是目标中的委派决策机制
 - web search 当前默认是 stub provider
 
 这些实现细节会被后续 refactor 替换，但替换时不得破坏 `03-agent-and-tool-contracts.md` 中定义的接口稳定性。

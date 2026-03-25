@@ -13,6 +13,12 @@ def _as_bool(value: str | None, default: bool) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _as_int(value: str | None, default: int) -> int:
+    if value is None or not value.strip():
+        return default
+    return int(value.strip())
+
+
 @dataclass(slots=True)
 class Settings:
     openai_api_key: str = ""
@@ -22,6 +28,8 @@ class Settings:
     vector_db_dir: Path = Path(".cache/vectorstore")
     runtime_dir: Path = Path("./runtime")
     web_search_provider: str = "stub"
+    subagent_max_concurrency: int = 3
+    subagent_timeout_seconds: int = 900
     use_stub_agents: bool = True
 
     @classmethod
@@ -37,6 +45,8 @@ class Settings:
             vector_db_dir=Path(os.getenv("VECTOR_DB_DIR", ".cache/vectorstore")),
             runtime_dir=Path(os.getenv("RUNTIME_DIR", "./runtime")),
             web_search_provider=os.getenv("WEB_SEARCH_PROVIDER", "stub"),
+            subagent_max_concurrency=_as_int(os.getenv("SUBAGENT_MAX_CONCURRENCY"), 3),
+            subagent_timeout_seconds=_as_int(os.getenv("SUBAGENT_TIMEOUT_SECONDS"), 900),
             use_stub_agents=_as_bool(os.getenv("USE_STUB_AGENTS"), use_stub_default),
         )
         if settings.openai_base_url:

@@ -87,6 +87,7 @@
 
 - 从 `.env` 和环境变量加载配置
 - 管理 `model_name`、`base_url`、`runtime_dir`、`vector_db_dir`
+- 管理 `subagent_max_concurrency`、`subagent_timeout_seconds`
 - 决定是否走 stub agents
 
 ### RunState
@@ -137,13 +138,13 @@
 
 职责：
 
+- 在真实模型路径下通过 `task` tool-calling 决定是否委派
 - 处理简单任务直答
-- 在特定任务上创建 delegation task
 - 汇总单个 delegated result 并写出 `outputs/final.md`
 
 当前限制：
 
-- 只支持较保守的 delegation 触发条件
+- stub 路径仍保留较保守的 delegation heuristics 作为 fallback
 - 复杂任务仍会回退旧版 workflow
 
 ### Shared Agent Helpers
@@ -218,8 +219,9 @@
 
 当前限制：
 
-- 只有单任务执行路径
-- 还没有并发、超时和 nested delegation 护栏
+- 只有保守的顺序执行路径
+- 已有并发上限检查和 nested delegation 校验
+- 还没有真实并发执行和硬超时中断
 
 ### Research Agent
 

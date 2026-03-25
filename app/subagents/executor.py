@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from time import perf_counter
 from typing import Any
 
 from app.config.settings import Settings
@@ -13,16 +14,43 @@ class SubagentExecutor:
         self.settings = settings
         self.registry = registry or SubagentRegistry()
 
+    def execute_tasks(self, state: RunState, workspace: Workspace, task_ids: list[str]) -> list[dict[str, Any]]:
+        if len(task_ids) > self.settings.subagent_max_concurrency:
+            raise ValueError(
+                "requested task batch exceeds subagent_max_concurrency "
+                f"({len(task_ids)} > {self.settings.subagent_max_concurrency})"
+            )
+        return [self.execute_task(state, workspace, task_id) for task_id in task_ids]
+
     def execute_task(self, state: RunState, workspace: Workspace, task_id: str) -> dict[str, Any]:
         task = self._find_task(state, task_id)
         spec = self.registry.get(str(task["subagent_type"]))
+        self._validate_task(task, spec.name)
+        effective_timeout = min(int(task.get("timeout_seconds", spec.timeout_seconds)), self.settings.subagent_timeout_seconds)
+        if effective_timeout <= 0:
+            return self._mark_timeout(state, workspace, task, "configured timeout is not positive")
 
+        started = perf_counter()
         artifact_path = f"subagents/{task_id}/result.md"
         summary = self._build_summary(task)
         artifact_body = self._render_artifact(task, spec.description, summary)
         workspace.write_text(artifact_path, artifact_body)
+        elapsed_seconds = perf_counter() - started
 
-        updated_task = {**task, "status": "completed"}
+        if elapsed_seconds > effective_timeout:
+            return self._mark_timeout(
+                state,
+                workspace,
+                task,
+                f"subagent exceeded timeout after {elapsed_seconds:.3f}s",
+            )
+
+        updated_task = {
+            **task,
+            "status": "completed",
+            "effective_timeout_seconds": effective_timeout,
+            "elapsed_seconds": round(elapsed_seconds, 6),
+        }
         state.record_subagent_task(**updated_task)
         workspace.append_manifest_task(updated_task)
 
@@ -34,6 +62,7 @@ class SubagentExecutor:
             "citations": [],
             "error": None,
             "subagent_type": task["subagent_type"],
+            "elapsed_seconds": round(elapsed_seconds, 6),
         }
         state.record_subagent_result(**result)
         workspace.append_manifest_result(result)
@@ -66,3 +95,37 @@ class SubagentExecutor:
             f"## Prompt\n{task['prompt']}\n\n"
             f"## Summary\n{summary}\n"
         )
+
+    @staticmethod
+    def _validate_task(task: dict[str, Any], resolved_type: str) -> None:
+        if str(task.get("subagent_type")) != resolved_type:
+            raise ValueError("task subagent_type does not match resolved registry type")
+        allowed_tools = {str(item) for item in task.get("allowed_tools", [])}
+        disallowed_tools = {str(item) for item in task.get("disallowed_tools", [])}
+        if "task" in allowed_tools:
+            raise ValueError("nested delegation is not allowed for subagent tasks")
+        if "task" not in disallowed_tools:
+            raise ValueError("subagent tasks must explicitly disallow the task tool")
+
+    def _mark_timeout(
+        self,
+        state: RunState,
+        workspace: Workspace,
+        task: dict[str, Any],
+        error: str,
+    ) -> dict[str, Any]:
+        updated_task = {**task, "status": "timeout"}
+        state.record_subagent_task(**updated_task)
+        workspace.append_manifest_task(updated_task)
+        result = {
+            "task_id": str(task["task_id"]),
+            "status": "timeout",
+            "summary": "",
+            "artifacts": [],
+            "citations": [],
+            "error": error,
+            "subagent_type": task["subagent_type"],
+        }
+        state.record_subagent_result(**result)
+        workspace.append_manifest_result(result)
+        return result

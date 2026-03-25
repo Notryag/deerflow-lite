@@ -15,7 +15,9 @@
 - `RunState`、workspace、artifact manifest 已完成第一轮 subagent-aware 改造
 - `lead_agent` 已接入简单任务直答路径
 - `task` 工具、`subagent registry` 和最小 `subagent executor` 已完成第一轮实现与测试
-- `lead_agent` 已能走直答路径和单任务 delegation 路径
+- `lead_agent` 在真实模型路径下已改为通过 `task` tool-calling 决定是否委派
+- stub 路径仍保留少量 heuristics 作为 fallback
+- `subagent executor` 已补上批量并发上限检查和 nested delegation contract 校验
 - 当前代码对复杂任务仍保留旧版 `orchestrator -> research -> writer` 回退流程
 - CLI MVP 仍可运行
 - 本地 retrieval 已可用
@@ -26,8 +28,8 @@
 当前验证状态：
 
 - `python -m unittest discover -s tests -v` 已通过
-- 当前共有 `18` 个测试通过
-- 新架构已具备 `T1` 到 `T4` 的最小验证，但 `executor` 仍缺并发、超时和 nested delegation 护栏
+- 当前共有 `20` 个测试通过
+- 新架构已具备 `T1` 到 `T4` 的最小验证，但 `executor` 仍缺真实并发执行和硬超时中断能力
 
 ## 2. Progress By Track
 
@@ -40,9 +42,9 @@
 | lead agent skeleton | completed | 100% | 简单任务可直答，复杂任务仍回退旧流程 |
 | 本地 retrieval | completed | 85% | MVP 可用，质量和索引策略仍可加强 |
 | file tools | completed | 90% | 安全校验和测试已具备 |
-| lead agent runtime | in_progress | 55% | 已支持直答和单任务 delegation，复杂任务仍回退旧流程 |
+| lead agent runtime | in_progress | 60% | 真实模型路径已切到 tool-calling delegation，stub 路径仍有 fallback heuristics |
 | task tool / registry | completed | 100% | registry、task tool、lead-agent wiring 已打通 |
-| subagent executor | in_progress | 40% | 已能执行单任务并落 artifact，尚无并发/超时保护 |
+| subagent executor | in_progress | 60% | 已有单任务执行、并发上限检查、nested delegation 校验，仍缺真实并发与硬超时 |
 | web search | pending | 20% | 当前仍为 stub |
 | python exec | pending | 15% | 已有基础函数，未纳入新架构 |
 | 运行健壮性 | pending | 20% | 新架构的 timeout、manifest、失败恢复尚未实现 |
@@ -52,7 +54,7 @@
 
 建议按以下顺序继续：
 
-1. 为 `subagent executor` 补并发、超时和单层委派保护
+1. 为 `subagent executor` 补真实并发执行和硬超时中断
 2. 把旧版 research / writer 逻辑迁移成可复用的 subtask prompt 或模板
 3. 再做真实 `search_web` provider 和受控执行能力
 4. 最后再考虑 API
@@ -60,7 +62,7 @@
 原因：
 
 - `T1`、`T2`、`T3` 已经把状态、lead-agent、task contract 串起来
-- 当前 delegation 主链已经可跑，剩下的是 executor 级的运行保护和更真实的 worker 能力
+- 当前 delegation 主链已经可跑，剩下的是 executor 级的真实运行保护和更真实的 worker 能力
 - 在 delegation 主链完成前继续补 provider，收益仍然有限
 
 ## 4. Task Breakdown
@@ -117,7 +119,8 @@ Status: `completed`
 当前结果：
 
 - 已新增 `lead_agent.py`
-- 简单任务会被 `lead_agent` 直接完成并写出 `outputs/final.md`
+- 真实模型路径下，是否委派由 `lead_agent` 通过 `task` tool-calling 决定
+- 简单任务在 stub 路径下仍可直接完成并写出 `outputs/final.md`
 - 复杂任务暂时继续回退到旧版 `orchestrator -> research -> writer` 流程
 
 ### T3. Task Tool And Registry
@@ -174,7 +177,9 @@ Status: `in_progress`
 
 - 已新增 `app/subagents/executor.py`
 - executor 已能执行单个 task、回填 task/result 状态并写入 `subagents/{task_id}/result.md`
-- 并发、超时和 nested delegation 护栏仍未完成，因此本主题仍处于进行中
+- executor 已有批量并发上限检查
+- executor 已显式拒绝 nested delegation contract
+- 真实并发执行和硬超时中断仍未完成，因此本主题仍处于进行中
 
 ### T5. Legacy Logic Migration
 
@@ -239,7 +244,7 @@ Status: `deferred`
 理由：
 
 - delegation 主链已经打通，接下来最关键的是把 executor 从“可跑”补到“可控”
-- 并发、超时和 nested delegation 限制会决定这套架构能不能稳定扩展
+- 真正的并发执行、硬超时中断和更真实的 worker 隔离会决定这套架构能不能稳定扩展
 - 在 executor 护栏没补完前，继续增加更多 tool/provider 的收益有限
 
 ## 6. Progress Update Rule
