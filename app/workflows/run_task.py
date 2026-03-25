@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from uuid import uuid4
 
+from app.agents.lead_agent import LeadAgent
 from app.agents.orchestrator import OrchestratorAgent
 from app.agents.research_agent import ResearchAgent
 from app.agents.writer_agent import WriterAgent
@@ -41,6 +42,12 @@ def run_task(
     workspace.write_text("input/task.md", user_task)
 
     try:
+        state = LeadAgent(settings).run(state, workspace)
+        if state.task_type == "direct_response" and state.final_answer:
+            state.status = "completed"
+            logger.info("lead agent completed without delegation")
+            return state
+
         state = OrchestratorAgent(settings).run(state, workspace)
 
         if state.needs_retrieval and data_dir:

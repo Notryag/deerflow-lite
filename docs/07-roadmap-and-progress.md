@@ -12,17 +12,21 @@
 
 - 文档体系已拆分并建立 source-of-truth 规则
 - 文档目标架构已切换到 `Lead Agent + task/subagent`
-- 当前代码仍是旧版固定 `orchestrator -> research -> writer` 流程
+- `RunState`、workspace、artifact manifest 已完成第一轮 subagent-aware 改造
+- `lead_agent` 已接入简单任务直答路径
+- `task` 工具和 `subagent registry` 已完成第一轮实现与测试
+- 当前代码对复杂任务仍保留旧版 `orchestrator -> research -> writer` 回退流程
 - CLI MVP 仍可运行
 - 本地 retrieval 已可用
 - stub agent 路径可用
 - 真实模型路径已打通
-- 现有测试仍主要覆盖旧版 workflow
+- 测试已覆盖新状态对象、manifest、lead agent 直答路径和旧版 workflow 回退路径
 
 当前验证状态：
 
-- `python -m unittest discover -s tests -v` 通过的是旧版流程验证
-- 新目标架构的 runtime 还没有实现，因此还没有对应验证
+- `python -m unittest discover -s tests -v` 已通过
+- 当前共有 `16` 个测试通过
+- 新架构已具备 `T1 + T2` 的基础验证，`T3` 已完成基础实现，但 `executor` 和 lead-agent delegation 还没有接上
 
 ## 2. Progress By Track
 
@@ -31,10 +35,12 @@
 | 文档治理与拆分 | completed | 100% | 已建立 `01` 到 `06` 主规范 |
 | 目标架构文档对齐 | completed | 100% | 目标已切换到 subagent harness |
 | 旧版 CLI 主流程 | completed | 100% | 仍可创建 workspace 和 final output |
+| harness state / workspace | completed | 100% | 已支持 trace、artifact、manifest，并保留旧字段兼容 |
+| lead agent skeleton | completed | 100% | 简单任务可直答，复杂任务仍回退旧流程 |
 | 本地 retrieval | completed | 85% | MVP 可用，质量和索引策略仍可加强 |
 | file tools | completed | 90% | 安全校验和测试已具备 |
-| lead agent runtime | pending | 10% | 仅有旧版 orchestrator 作为迁移参考 |
-| task tool / registry | pending | 0% | 尚未开始 |
+| lead agent runtime | in_progress | 35% | 已有直答路径，尚未接入 task/subagent delegation |
+| task tool / registry | in_progress | 60% | registry 与 task tool 已实现，lead-agent wiring 仍未完成 |
 | subagent executor | pending | 0% | 尚未开始 |
 | web search | pending | 20% | 当前仍为 stub |
 | python exec | pending | 15% | 已有基础函数，未纳入新架构 |
@@ -45,25 +51,23 @@
 
 建议按以下顺序继续：
 
-1. 完成 `RunState`、workspace、manifest 的新 contract 落地
-2. 实现 `lead_agent` 骨架
-3. 实现 `task` 工具与 `subagent registry`
-4. 实现 `subagent executor` 的并发、超时和单层委派保护
-5. 把旧版 research / writer 逻辑迁移成可复用的 subtask prompt 或模板
-6. 再做真实 `search_web` provider 和受控执行能力
-7. 最后再考虑 API
+1. 把 `task` 工具接入 `lead_agent`
+2. 实现 `subagent executor` 的并发、超时和单层委派保护
+3. 把旧版 research / writer 逻辑迁移成可复用的 subtask prompt 或模板
+4. 再做真实 `search_web` provider 和受控执行能力
+5. 最后再考虑 API
 
 原因：
 
-- 现阶段最大的缺口不是工具 provider，而是目标架构与当前代码完全不一致
-- 如果先补 `search_web`，后续仍要再做一次 runtime 重构，返工高
-- 先完成 harness 基础层，后续 retrieval、web、shell 才有稳定承载点
+- `T1` 和 `T2` 已把基础状态和 lead-agent 入口搭起来
+- `T3` 已经提供了 registry 和 task tool，当前真正的缺口是把它们接到 lead agent 和 executor 上
+- 在 delegation 主链完成前继续补 provider，收益仍然有限
 
 ## 4. Task Breakdown
 
 ### T1. Harness State And Workspace Refactor
 
-Status: `next`
+Status: `completed`
 
 目标：
 
@@ -84,9 +88,15 @@ Status: `next`
 - 新状态结构可以支撑 subagent runtime
 - workspace 可以记录 subagent 产物和执行记录
 
+当前结果：
+
+- `RunState` 已支持 `trace_id`、`subagent_tasks`、`subagent_results`、`artifact_files`
+- workspace 已创建 `workspace/`、`subagents/` 并自动生成 `subagents/manifest.json`
+- 旧版 notes / output 路径仍保持兼容
+
 ### T2. Lead Agent Skeleton
 
-Status: `next`
+Status: `completed`
 
 目标：
 
@@ -104,9 +114,15 @@ Status: `next`
 - 简单任务在不创建 subagent 的情况下可完成
 - `outputs/final.md` 可由 lead agent 直接生成
 
+当前结果：
+
+- 已新增 `lead_agent.py`
+- 简单任务会被 `lead_agent` 直接完成并写出 `outputs/final.md`
+- 复杂任务暂时继续回退到旧版 `orchestrator -> research -> writer` 流程
+
 ### T3. Task Tool And Registry
 
-Status: `next`
+Status: `in_progress`
 
 目标：
 
@@ -124,6 +140,14 @@ Status: `next`
 
 - `lead_agent` 能创建并跟踪 subagent task
 - `task` 返回结构化结果
+
+当前结果：
+
+- 已新增 `app/subagents/registry.py`
+- 已新增 `app/tools/task_tool.py`
+- registry 已支持 `general-purpose` 和 `bash`
+- `task` 工具已支持参数校验、类型校验、默认 `max_turns` 和 manifest 落盘
+- lead-agent wiring 仍未完成，因此本主题仍处于进行中
 
 ### T4. Subagent Executor
 
@@ -204,13 +228,13 @@ Status: `deferred`
 
 ## 5. Current Focus Recommendation
 
-如果下一步只做一个主题，优先做 `T1. Harness State And Workspace Refactor`。
+如果下一步只做一个主题，优先做 `T3. Task Tool And Registry`。
 
 理由：
 
-- 它是所有后续 subagent 能力的地基
-- 它能把文档中的目标 contract 变成可编码对象
-- 它比先接 provider 更能减少返工
+- lead agent 已经有了可用入口，下一步就该接上 delegation 的创建接口
+- registry 会决定 subagent 类型、工具集和限制策略，是 executor 的前置条件
+- 只有 `task` contract 落地后，后续 executor 和 subagent 测试才有稳定依附点
 
 ## 6. Progress Update Rule
 

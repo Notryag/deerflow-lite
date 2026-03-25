@@ -9,6 +9,30 @@ from app.workflows.run_task import run_task
 
 
 class WorkflowTests(unittest.TestCase):
+    def test_run_task_allows_lead_agent_direct_response(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            settings = Settings(
+                runtime_dir=root / "runtime",
+                vector_db_dir=root / "vectors",
+                use_stub_agents=True,
+            )
+            state = run_task(
+                user_task="Say hello in one sentence.",
+                thread_id="thread-direct",
+                settings=settings,
+            )
+
+            workspace = Path(state.workspace_dir or "")
+            self.assertEqual(state.status, "completed")
+            self.assertEqual(state.task_type, "direct_response")
+            self.assertTrue((workspace / "outputs" / "final.md").exists())
+            self.assertTrue((workspace / "subagents" / "manifest.json").exists())
+            self.assertFalse((workspace / "notes" / "research.md").exists())
+            self.assertEqual(state.notes_files, [])
+            self.assertIn("outputs/final.md", state.artifact_files)
+            self.assertTrue(bool(state.final_answer))
+
     def test_run_task_creates_workspace_notes_and_final_output(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
