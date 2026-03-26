@@ -81,6 +81,11 @@ def _summarize_items(items: list[dict[str, Any]], content_key: str, limit: int =
 
 
 def build_chat_model(settings: Settings):
+    if use_stub_agents(settings):
+        from app.agents.local_model import LocalToolCallingChatModel
+
+        return LocalToolCallingChatModel()
+
     from langchain_openai import ChatOpenAI
 
     return ChatOpenAI(

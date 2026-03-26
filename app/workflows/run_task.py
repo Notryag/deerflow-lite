@@ -43,9 +43,15 @@ def run_task(
 
     try:
         state = LeadAgent(settings).run(state, workspace)
-        if state.task_type in {"direct_response", "delegated_response"} and state.final_answer:
+        if state.task_type == "direct_response" and state.final_answer:
             state.status = "completed"
             logger.info("lead agent completed before legacy workflow")
+            return state
+        if state.task_type == "delegated_response" and state.final_answer:
+            write_research_notes(state, workspace)
+            write_final_report(state, workspace)
+            state.status = "completed"
+            logger.info("lead agent completed after delegation")
             return state
 
         delegated = _run_fallback_subagent(state, workspace, settings)

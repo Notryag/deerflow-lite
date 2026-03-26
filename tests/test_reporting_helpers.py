@@ -11,7 +11,6 @@ from app.agents.writer_agent import WriterAgent
 from app.config.settings import Settings
 from app.runtime.state import RunState
 from app.runtime.workspace import Workspace
-from app.subagents.builtins import run_builtin_subagent
 from app.subagents.rendering import (
     ResearchNotes,
     WriterOutput,
@@ -23,6 +22,7 @@ from app.subagents.rendering import (
     render_research_notes,
     render_subagent_result_markdown,
 )
+from app.subagents.runner import run_subagent
 
 
 class ReportingHelpersTests(unittest.TestCase):
@@ -213,22 +213,32 @@ class ReportingHelpersTests(unittest.TestCase):
         self.assertIn("- notes/research.md", rendered)
         self.assertIn("- subagents/task_001/result.md", rendered)
 
-    def test_builtin_subagent_artifact_includes_summary_and_prompt_excerpt(self) -> None:
-        task = {
-            "task_id": "task_123",
-            "description": "Inspect docs",
-            "prompt": "Read the workspace, identify the relevant files, and summarize the migration plan.",
-            "subagent_type": "general-purpose",
-        }
+    def test_subagent_runner_writes_artifact_from_agent_output(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            workspace = Workspace(Path(tmp), "thread-subagent").create()
+            workspace.write_text("workspace/plan.md", "Migration plan")
+            task = {
+                "task_id": "task_123",
+                "description": "Inspect docs",
+                "prompt": "Read the workspace, identify the relevant files, and summarize the migration plan.",
+                "subagent_type": "general-purpose",
+                "runtime_tools": ["list_workspace_files", "read_file"],
+                "runtime_context": {
+                    "runtime_dir": str(Path(tmp)),
+                    "thread_id": "thread-subagent",
+                    "user_task": "Inspect docs",
+                },
+            }
 
-        result = run_builtin_subagent(task, "general-purpose", "General-purpose reasoning worker")
+            result = run_subagent(task, "general-purpose", "General-purpose reasoning worker", Settings())
 
-        self.assertEqual(result["artifact_path"], "subagents/task_123/result.md")
-        self.assertIn("task_123", result["artifact_body"])
-        self.assertIn("Inspect docs", result["artifact_body"])
-        self.assertIn("General-purpose reasoning worker", result["artifact_body"])
-        self.assertIn("Prompt focus:", result["artifact_body"])
-        self.assertIn("migration plan", result["summary"])
+            self.assertEqual(result["artifact_path"], "subagents/task_123/result.md")
+            self.assertIn("task_123", result["artifact_body"])
+            self.assertIn("Inspect docs", result["artifact_body"])
+            self.assertIn("General-purpose reasoning worker", result["artifact_body"])
+            self.assertIn("list_workspace_files", result["artifact_body"])
+            self.assertIn("read_file", result["artifact_body"])
+            self.assertIn("Completed the delegated task.", result["summary"])
 
     def test_shared_subagent_summary_and_artifact_renderer_are_consistent(self) -> None:
         task = {

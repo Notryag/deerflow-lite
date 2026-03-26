@@ -55,10 +55,11 @@ app/
   agents/
     lead_agent.py
     common.py
+    local_model.py
   subagents/
     registry.py
     executor.py
-    builtins.py
+    runner.py
   tools/
     task_tool.py
     langchain_toolset.py
@@ -174,7 +175,7 @@ subagent 产生的中间 notes、代码、草稿、分析结果 SHOULD 写入 `w
 - middleware MUST NOT 替模型决定是否搜索、是否检索、是否读写文件、是否委派
 - workflow SHOULD NOT 用业务 heuristics 预判这些动作
 - 这些动作 SHOULD 由模型在 tool-calling 过程中自主决定
-- stub 路径 MAY 只保留极小的 deterministic 直答能力用于本地测试，但 MUST NOT 扩展成完整业务决策层
+- 本地无 API 的测试路径 MAY 使用 fake tool-calling model，但 MUST 复用与真实模型相同的 agent/tool 执行闭环
 
 允许注入到 lead agent 的内容：
 
@@ -271,8 +272,8 @@ SUBAGENT_TIMEOUT_SECONDS=900
 - 复杂任务 fallback 会直接创建 `general-purpose` subagent，再由 tool/helper 产出 notes / report
 - `orchestrator.py` 仍保留在仓库中作为 legacy planning 参考实现
 - retrieval 使用本地 deterministic embedding 和 JSON vector store 作为 MVP 默认实现
-- 没有模型配置时，agent 允许走 stub 路径，但对外 contract 不变
-- stub 路径当前只保留极小的 deterministic 直答能力，其余任务会回到 fallback subagent 路径
+- 没有模型配置时，lead agent 与 subagent 会统一落到本地 fake tool-calling model，但对外 contract 不变
+- `subagent runner` 已改为真实 `create_agent(..., tools=[...])` 执行，而不是程序化脚本 worker
 - web search 当前默认是 stub provider
 
 这些实现细节会被后续 refactor 替换，但替换时不得破坏 `03-agent-and-tool-contracts.md` 中定义的接口稳定性。

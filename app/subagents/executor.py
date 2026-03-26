@@ -8,8 +8,8 @@ from typing import Any
 from app.config.settings import Settings
 from app.runtime.state import RunState
 from app.runtime.workspace import Workspace
-from app.subagents.builtins import read_worker_message, run_subagent_worker
 from app.subagents.registry import SubagentRegistry
+from app.subagents.runner import read_worker_message, run_subagent_worker
 from app.tools.langchain_toolset import build_langchain_tools
 
 
@@ -77,6 +77,7 @@ class SubagentExecutor:
         ]
         runtime_context = {
             "thread_id": state.thread_id,
+            "trace_id": state.trace_id,
             "runtime_dir": str(workspace.runtime_dir),
             "workspace_dir": str(workspace.thread_dir),
             "data_dir": state.data_dir,
@@ -107,7 +108,7 @@ class SubagentExecutor:
         result_queue = ctx.Queue()
         process = ctx.Process(
             target=run_subagent_worker,
-            args=(task, spec.name, spec.description, result_queue),
+            args=(task, spec.name, spec.description, self.settings, result_queue),
         )
 
         started = perf_counter()
@@ -156,8 +157,8 @@ class SubagentExecutor:
             "task_id": str(task["task_id"]),
             "status": "completed",
             "summary": body["summary"],
-            "artifacts": [body["artifact_path"]],
-            "citations": [],
+            "artifacts": list(body.get("artifacts", [body["artifact_path"]])),
+            "citations": list(body.get("citations", [])),
             "error": None,
             "subagent_type": task["subagent_type"],
             "elapsed_seconds": round(elapsed_seconds, 6),

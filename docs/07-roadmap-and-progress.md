@@ -13,25 +13,24 @@
 - 文档体系已拆分并建立 source-of-truth 规则
 - 文档目标架构已切换到 `Lead Agent + task/subagent`
 - `RunState`、workspace、artifact manifest 已完成第一轮 subagent-aware 改造
-- `lead_agent` 已接入简单任务直答路径
+- `lead_agent` 已统一走 LangChain `create_agent(..., tools=[...])` 路径
 - `task` 工具、`subagent registry` 和最小 `subagent executor` 已完成第一轮实现与测试
 - `lead_agent` 在真实模型路径下已改为通过 `task` tool-calling 决定是否委派
-- stub 路径已收窄为极小的 deterministic 直答能力，复杂任务不再由程序 heuristics 做委派/搜索判断
+- 本地无 API 时，lead agent 和 subagent 统一复用 fake tool-calling model，而不是单独的程序化 stub 分支
 - `subagent executor` 已补上批量并发上限检查和 nested delegation contract 校验
 - `subagent executor` 已补上线程池调度加子进程 worker、timeout 结果回填
-- `app/subagents/builtins.py` 已作为内置 worker 实现落地
 - 主 workflow 对复杂任务已经直接创建 `general-purpose` subagent，不再依赖固定 `orchestrator -> research -> writer` 链路
 - `app/subagents/rendering.py` 已落地第一版共享 helper 层，research / report 产出逻辑开始同时服务 legacy agent 和 subagent runtime
 - `app/tools/reporting.py` 已承接 fallback workflow 的 notes / final report 产出
 - middleware / tool 边界已经记入主规范：middleware 只管上下文与约束，能力和业务决策必须回到 tool-calling
 - `app/tools/langchain_toolset.py` 已把 retrieval / web / file / python / task 封装成可挂载的 `@tool` 集合，并接到 `lead_agent` 真实模型路径
 - subagent executor 已开始按 registry 解析 runtime tool bundle，并把实际工具面写进 subagent task/result artifact
-- built-in subagent 现在已能最小真实执行部分工具，包括 workspace file listing、stub web search、本地 retrieval、显式 read/write 和显式 python 执行
+- `app/subagents/runner.py` 已替代脚本式 built-in worker，subagent 现在在子进程里运行真实 `create_agent(..., tools=[...])`
 - CLI MVP 仍可运行
 - 本地 retrieval 已可用
-- stub agent 路径可用
+- 本地 fake tool-calling agent 路径可用
 - 真实模型路径已打通
-- 测试已覆盖新状态对象、manifest、lead agent 直答路径、共享 helper 和复杂任务 fallback subagent 路径
+- 测试已覆盖新状态对象、manifest、统一 lead-agent runtime、共享 helper 和复杂任务 delegation 路径
 
 当前验证状态：
 
@@ -50,9 +49,9 @@
 | lead agent skeleton | completed | 100% | 简单任务可直答，复杂任务可落到 fallback subagent 路径 |
 | 本地 retrieval | completed | 85% | MVP 可用，质量和索引策略仍可加强 |
 | file tools | completed | 90% | 安全校验和测试已具备 |
-| lead agent runtime | in_progress | 75% | 真实模型路径已切到完整 tool bundle，workflow 侧 web-search heuristics 已移除，stub 路径仅保留极小直答能力 |
+| lead agent runtime | in_progress | 88% | lead 与本地 fake model 已统一走 `create_agent(..., tools=[...])`，剩余工作主要是继续清理 legacy 参考实现 |
 | task tool / registry | completed | 100% | registry、task tool、lead-agent wiring 已打通 |
-| subagent executor | in_progress | 92% | 已有线程池调度、子进程 worker、timeout 终止、并发上限检查、nested delegation 校验，并开始最小真实工具执行 |
+| subagent executor | in_progress | 96% | 已有线程池调度、子进程 agent worker、timeout 终止、并发上限检查、nested delegation 校验，并已切到真实 tool-calling runtime |
 | legacy logic migration | in_progress | 85% | 主 workflow 已摆脱固定 `research/writer` 依赖，主缺口变成移除 `orchestrator` 的残留参考地位 |
 | web search | pending | 20% | 当前仍为 stub |
 | python exec | pending | 15% | 已有基础函数，未纳入新架构 |
@@ -63,16 +62,16 @@
 
 建议按以下顺序继续：
 
-1. 继续清理程序侧 heuristics，把 retrieval 等剩余能力逐步接回 lead-agent / subagent 的 tool-calling 路径
+1. 继续清理 legacy 参考实现，把 `orchestrator` / `research_agent` / `writer_agent` 的残留地位进一步边缘化
 2. 再做真实 `search_web` provider 和受控执行能力
-3. 为 subagent 增加更真实的 worker 能力和工具接入
+3. 补强 subagent 的多轮工具能力与观测记录
 4. 最后再考虑 API
 
 原因：
 
 - `T1`、`T2`、`T3` 已经把状态、lead-agent、task contract 串起来
 - 当前 delegation 主链已经可跑，executor 也已经有基础隔离和 timeout 终止
-- 剩下的核心缺口变成更真实的 worker 能力、工具接入和旧逻辑迁移
+- 脚本式 subagent worker 已删除，当前核心缺口变成 legacy 代码收口和真实 provider
 - 在 delegation 主链完成前继续补 provider，收益仍然有限
 
 ## 4. Task Breakdown
@@ -130,8 +129,8 @@ Status: `completed`
 
 - 已新增 `lead_agent.py`
 - 真实模型路径下，是否委派由 `lead_agent` 通过 `task` tool-calling 决定
-- 简单任务在 stub 路径下仍可直接完成并写出 `outputs/final.md`
-- 当 `lead_agent` 未直接完成复杂任务时，workflow 会进入 fallback subagent 路径
+- lead agent 在真实模型和本地 fake model 下都走同一套 `create_agent(..., tools=[...])` 路径
+- 当 `lead_agent` 未完成任务时，workflow 才会进入 fallback subagent 路径
 
 ### T3. Task Tool And Registry
 
@@ -186,14 +185,14 @@ Status: `in_progress`
 当前结果：
 
 - 已新增 `app/subagents/executor.py`
-- 已新增 `app/subagents/builtins.py`
+- 已新增 `app/subagents/runner.py`
 - executor 已能执行单个或多个 task、回填 task/result 状态并写入 `subagents/{task_id}/result.md`
 - executor 已有线程池调度
 - executor 已有子进程 worker 隔离
 - executor 已有批量并发上限检查
 - executor 已有 timeout 结果回填
 - executor 已显式拒绝 nested delegation contract
-- 更真实的 worker 能力和工具接入仍未完成，因此本主题仍处于进行中
+- subagent worker 已切到真实 LangChain tool-calling runtime，因此本主题接近完成
 
 ### T5. Legacy Logic Migration
 
@@ -208,7 +207,7 @@ Status: `in_progress`
 
 - 提取 notes / summary 渲染逻辑
 - 提取 evidence 归一化和 markdown 渲染逻辑
-- 让 built-in worker 复用相同的 report helper
+- 让 subagent runner 复用相同的 report helper
 - 继续提取 prompt 模板和最终汇总逻辑
 - 用 tool / helper 替换 workflow 中剩余的固定 `ResearchAgent` / `WriterAgent` 依赖
 - 清理固定三段式依赖
@@ -225,12 +224,12 @@ Status: `in_progress`
 - 已新增 `app/tools/reporting.py`
 - `general-purpose` 默认上限已提升到 `50` turns，`bash` 提升到 `30` turns
 - `research_agent` 与 `writer_agent` 已改为复用共享 helper
-- `builtins.py` 已改为复用共享 subagent summary / artifact 渲染逻辑
+- `runner.py` 已复用共享 subagent summary / artifact 渲染逻辑
 - `run_task` 的 fallback research / final report 产出已改走 `reporting.py`
 - `run_task` 的复杂任务 fallback 已直接创建 `general-purpose` subagent
 - executor 已会按 registry 过滤 subagent runtime tools，并把工具面写入 result artifact
-- built-in subagent 已能最小真实执行 `list_workspace_files`、`search_web`、`retrieve_knowledge`、显式 `read_file` / `write_file`、显式 `run_python_code`
-- 共享层目前已覆盖数据形状、summary、markdown 渲染和 prompt 模板；主缺口是把这种最小真实执行升级成真正的模型驱动 tool-calling worker
+- subagent runtime 已切到真实模型驱动 tool-calling worker
+- 共享层目前已覆盖数据形状、summary、markdown 渲染和 prompt 模板；主缺口是继续收口 legacy agent 的残留角色定位
 
 ### T6. Real Web Search And Controlled Execution
 

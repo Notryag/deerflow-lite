@@ -36,14 +36,15 @@
 3. [app/runtime/state.py](D:/workspace/github/deerflow-lite/app/runtime/state.py)
 4. [app/runtime/workspace.py](D:/workspace/github/deerflow-lite/app/runtime/workspace.py)
 5. [app/agents/lead_agent.py](D:/workspace/github/deerflow-lite/app/agents/lead_agent.py)
-6. [app/tools/langchain_toolset.py](D:/workspace/github/deerflow-lite/app/tools/langchain_toolset.py)
-7. [app/tools/task_tool.py](D:/workspace/github/deerflow-lite/app/tools/task_tool.py)
-8. [app/subagents/registry.py](D:/workspace/github/deerflow-lite/app/subagents/registry.py)
-9. [app/subagents/rendering.py](D:/workspace/github/deerflow-lite/app/subagents/rendering.py)
-10. [app/subagents/builtins.py](D:/workspace/github/deerflow-lite/app/subagents/builtins.py)
-11. [app/tools/reporting.py](D:/workspace/github/deerflow-lite/app/tools/reporting.py)
-12. [app/subagents/executor.py](D:/workspace/github/deerflow-lite/app/subagents/executor.py)
-13. [tests/test_workflow.py](D:/workspace/github/deerflow-lite/tests/test_workflow.py)
+6. [app/agents/local_model.py](D:/workspace/github/deerflow-lite/app/agents/local_model.py)
+7. [app/tools/langchain_toolset.py](D:/workspace/github/deerflow-lite/app/tools/langchain_toolset.py)
+8. [app/tools/task_tool.py](D:/workspace/github/deerflow-lite/app/tools/task_tool.py)
+9. [app/subagents/registry.py](D:/workspace/github/deerflow-lite/app/subagents/registry.py)
+10. [app/subagents/rendering.py](D:/workspace/github/deerflow-lite/app/subagents/rendering.py)
+11. [app/subagents/runner.py](D:/workspace/github/deerflow-lite/app/subagents/runner.py)
+12. [app/tools/reporting.py](D:/workspace/github/deerflow-lite/app/tools/reporting.py)
+13. [app/subagents/executor.py](D:/workspace/github/deerflow-lite/app/subagents/executor.py)
+14. [tests/test_workflow.py](D:/workspace/github/deerflow-lite/tests/test_workflow.py)
 
 ## 2. Code Entry Points
 
@@ -71,9 +72,8 @@
 - 初始化 `RunState`
 - 创建 workspace
 - 优先执行 `lead_agent`
-- 在匹配 delegation 时创建 task 并调用最小 `subagent executor`
+- 在匹配 delegation 时创建 task 并调用 `subagent executor`
 - 对复杂任务走 fallback subagent 路径
-- 根据 state 触发 retrieval 和 web search
 - 调用 reporting tool 写出 `notes/research.md` 和 `outputs/final.md`
 - 写日志并更新 run 状态
 
@@ -92,7 +92,7 @@
 - 从 `.env` 和环境变量加载配置
 - 管理 `model_name`、`base_url`、`runtime_dir`、`vector_db_dir`
 - 管理 `subagent_max_concurrency`、`subagent_timeout_seconds`
-- 决定是否走 stub agents
+- 控制是否使用本地 fake tool-calling model
 
 ### RunState
 
@@ -143,12 +143,11 @@
 职责：
 
 - 在真实模型路径下通过 `task` tool-calling 决定是否委派
-- 处理简单任务直答
+- 处理简单任务直答或委派后的最终汇总
 - 汇总单个 delegated result 并写出 `outputs/final.md`
 
 当前限制：
 
-- stub 路径仍保留较保守的 delegation heuristics 作为 fallback
 - 当 `lead_agent` 未直接完成复杂任务时，workflow 会进入 fallback subagent 路径
 
 ### Shared Agent Helpers
@@ -156,12 +155,12 @@
 文件：
 
 - [app/agents/common.py](D:/workspace/github/deerflow-lite/app/agents/common.py)
+- [app/agents/local_model.py](D:/workspace/github/deerflow-lite/app/agents/local_model.py)
 
 职责：
 
 - 构造 agent 上下文摘要
-- 构造 `ChatOpenAI`
-- 控制 stub / real model 路径切换
+- 构造真实模型或本地 fake tool-calling model
 - 提供 evidence、summary 等公用函数
 
 如果要调整真实模型路径、fallback、上下文注入，先看这个文件。
@@ -239,21 +238,22 @@
 
 - 当前并发层是“线程池调度 + 子进程 worker”
 - 已有并发上限检查和 nested delegation 校验
-- 当前是“最小真实工具执行”，还不是完整模型驱动 tool-calling worker
+- 子进程里已经运行真实 `create_agent(..., tools=[...])`
 
-### Built-In Workers
+### Subagent Runner
 
 文件：
 
-- [app/subagents/builtins.py](D:/workspace/github/deerflow-lite/app/subagents/builtins.py)
+- [app/subagents/runner.py](D:/workspace/github/deerflow-lite/app/subagents/runner.py)
 
 职责：
 
-- 复用共享渲染 helper 生成内置 worker 的摘要和 artifact
+- 在子进程里创建真实 LangChain subagent
+- 复用共享渲染 helper 生成 subagent 摘要和 artifact
 - 作为子进程 worker 的入口函数
 - 支持测试用的可控延时
-- 在 artifact 中记录当前 subagent 的 runtime tools
-- 最小真实执行 `list_workspace_files`、`search_web`、`retrieve_knowledge`、显式 `read_file` / `write_file` / `run_python_code`
+- 通过 agent 返回的消息流提取 executed tools 和 tool observations
+- 在 artifact 中记录当前 subagent 的 runtime tools 和执行轨迹
 
 ### Shared Rendering Helpers
 
@@ -266,7 +266,7 @@
 - 定义共享的 `ResearchNotes` 和 `WriterOutput`
 - 生成 research / final report markdown
 - 从 `RunState` 构造 stub notes / output
-- 生成 built-in worker 复用的 summary 和 artifact markdown
+- 生成 subagent runner 复用的 summary 和 artifact markdown
 
 ### Research Agent
 
@@ -282,7 +282,7 @@
 迁移意义：
 
 - 可提取为共享 research helper
-- 可与 built-in worker 复用同一套 notes / evidence / markdown 逻辑
+- 可与 subagent runner 复用同一套 notes / evidence / markdown 逻辑
 - 当前更接近 legacy reference，不应再作为主 workflow 的长期能力节点
 
 ### Writer Agent
@@ -300,7 +300,7 @@
 迁移意义：
 
 - 可提取为共享 report helper
-- 可与 lead agent 和 built-in worker 复用同一套 final report 逻辑
+- 可与 lead agent 和 subagent runner 复用同一套 final report 逻辑
 - 当前更接近 legacy reference，不应再作为主 workflow 的长期能力节点
 
 ## 5. Tools
@@ -401,7 +401,7 @@
 - [test_orchestrator.py](D:/workspace/github/deerflow-lite/tests/test_orchestrator.py): 旧版 orchestrator 决策
 - [test_reporting_tool.py](D:/workspace/github/deerflow-lite/tests/test_reporting_tool.py): reporting tool 落盘与 state 更新
 - [test_reporting_helpers.py](D:/workspace/github/deerflow-lite/tests/test_reporting_helpers.py): 共享 prompt、markdown renderer 与 subagent artifact contract
-- [test_workflow.py](D:/workspace/github/deerflow-lite/tests/test_workflow.py): lead-agent 直答、delegation、复杂任务 fallback subagent 主流程
+- [test_workflow.py](D:/workspace/github/deerflow-lite/tests/test_workflow.py): 统一 lead-agent runtime、delegation、复杂任务 fallback subagent 主流程
 
 ## 8. Hot Files By Task
 
@@ -440,7 +440,7 @@
 
 优先看：
 
-- [app/subagents/builtins.py](D:/workspace/github/deerflow-lite/app/subagents/builtins.py)
+- [app/subagents/runner.py](D:/workspace/github/deerflow-lite/app/subagents/runner.py)
 - [app/subagents/executor.py](D:/workspace/github/deerflow-lite/app/subagents/executor.py)
 - [app/agents/lead_agent.py](D:/workspace/github/deerflow-lite/app/agents/lead_agent.py)
 - [app/workflows/run_task.py](D:/workspace/github/deerflow-lite/app/workflows/run_task.py)
@@ -457,7 +457,7 @@
 - [app/agents/orchestrator.py](D:/workspace/github/deerflow-lite/app/agents/orchestrator.py)
 - [app/agents/research_agent.py](D:/workspace/github/deerflow-lite/app/agents/research_agent.py)
 - [app/agents/writer_agent.py](D:/workspace/github/deerflow-lite/app/agents/writer_agent.py)
-- [app/subagents/builtins.py](D:/workspace/github/deerflow-lite/app/subagents/builtins.py)
+- [app/subagents/runner.py](D:/workspace/github/deerflow-lite/app/subagents/runner.py)
 - [app/subagents/rendering.py](D:/workspace/github/deerflow-lite/app/subagents/rendering.py)
 - [app/tools/reporting.py](D:/workspace/github/deerflow-lite/app/tools/reporting.py)
 - [docs/07-roadmap-and-progress.md](D:/workspace/github/deerflow-lite/docs/07-roadmap-and-progress.md)
