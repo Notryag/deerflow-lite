@@ -14,7 +14,8 @@
 
 - `docs/01-05` 已经把目标定义成 `Lead Agent + task/subagent`
 - 当前代码已经有了 `lead_agent`、`task tool`、`subagent registry`、最小 `executor`，复杂任务 fallback 会直接创建 `general-purpose` subagent，research / report 产出走 tool/helper
-- `T5` 的迁移重点是把 `research` / `writer` 中的 notes、summary、evidence、markdown 渲染逻辑抽成共享 helper 和 reporting tool，让 legacy agent 和 subagent runtime 复用同一层产出代码
+- 当前主链已经收敛到 `lead_agent + subagent executor + reporting`
+- 后续增量应优先加在这条主链上，而不是恢复旧版固定专用 agent
 
 因此，本文件的作用是帮助你定位迁移起点，而不是证明当前实现已经符合目标架构。
 
@@ -132,7 +133,7 @@
 
 ## 4. Current Agents And Delegation Components
 
-以下内容同时包含新架构组件和旧版固定角色 agent。
+以下内容只关注当前仍在主链或直接支撑主链的组件。
 
 ### Lead Agent
 
@@ -164,24 +165,6 @@
 - 提供 evidence、summary 等公用函数
 
 如果要调整真实模型路径、fallback、上下文注入，先看这个文件。
-
-### Orchestrator
-
-文件：
-
-- [app/agents/orchestrator.py](D:/workspace/github/deerflow-lite/app/agents/orchestrator.py)
-
-职责：
-
-- 决定 `task_type`
-- 生成 `plan`
-- 决定 `needs_retrieval`、`needs_web_search`、`needs_python`
-- 对真实模型输出做归一化兜底
-
-迁移意义：
-
-- 可作为未来 `lead_agent` 的 planning 参考
-- 但不能直接等同于目标中的 subagent harness
 
 ### Task Tool
 
@@ -268,41 +251,6 @@
 - 从 `RunState` 构造 stub notes / output
 - 生成 subagent runner 复用的 summary 和 artifact markdown
 
-### Research Agent
-
-文件：
-
-- [app/agents/research_agent.py](D:/workspace/github/deerflow-lite/app/agents/research_agent.py)
-
-职责：
-
-- 把 retrieval / web search 结果整理成 `notes/research.md`
-- 在真实模型输出质量不足时回退到本地 stub notes
-
-迁移意义：
-
-- 可提取为共享 research helper
-- 可与 subagent runner 复用同一套 notes / evidence / markdown 逻辑
-- 当前更接近 legacy reference，不应再作为主 workflow 的长期能力节点
-
-### Writer Agent
-
-文件：
-
-- [app/agents/writer_agent.py](D:/workspace/github/deerflow-lite/app/agents/writer_agent.py)
-
-职责：
-
-- 生成 `outputs/final.md`
-- 写入 `final_answer`
-- 在真实模型输出不可靠时回退到 stub output
-
-迁移意义：
-
-- 可提取为共享 report helper
-- 可与 lead agent 和 subagent runner 复用同一套 final report 逻辑
-- 当前更接近 legacy reference，不应再作为主 workflow 的长期能力节点
-
 ## 5. Tools
 
 ### File Tools
@@ -363,7 +311,7 @@
 - 用共享 helper 生成 `outputs/final.md`
 - 更新 `RunState.notes_files`、`RunState.output_files`、`RunState.artifact_files`
 
-这是把固定 `ResearchAgent` / `WriterAgent` 产出能力下沉到 tool 层的第一步。
+这是 research / final report 产出留在主链中的最小 helper 层。
 
 ## 6. Retrieval Stack
 
@@ -398,7 +346,6 @@
 - [test_langchain_toolset.py](D:/workspace/github/deerflow-lite/tests/test_langchain_toolset.py): 完整 tool bundle 暴露、检索和搜索 tool 的 state 回填
 - [test_langchain_tool_execution.py](D:/workspace/github/deerflow-lite/tests/test_langchain_tool_execution.py): file/python tool 的实际执行与 artifact 更新
 - [test_subagent_executor.py](D:/workspace/github/deerflow-lite/tests/test_subagent_executor.py): executor 执行、批量执行、timeout、并发上限与 nested delegation 校验
-- [test_orchestrator.py](D:/workspace/github/deerflow-lite/tests/test_orchestrator.py): 旧版 orchestrator 决策
 - [test_reporting_tool.py](D:/workspace/github/deerflow-lite/tests/test_reporting_tool.py): reporting tool 落盘与 state 更新
 - [test_reporting_helpers.py](D:/workspace/github/deerflow-lite/tests/test_reporting_helpers.py): 共享 prompt、markdown renderer 与 subagent artifact contract
 - [test_workflow.py](D:/workspace/github/deerflow-lite/tests/test_workflow.py): 统一 lead-agent runtime、delegation、复杂任务 fallback subagent 主流程
@@ -454,9 +401,6 @@
 优先看：
 
 - [app/agents/common.py](D:/workspace/github/deerflow-lite/app/agents/common.py)
-- [app/agents/orchestrator.py](D:/workspace/github/deerflow-lite/app/agents/orchestrator.py)
-- [app/agents/research_agent.py](D:/workspace/github/deerflow-lite/app/agents/research_agent.py)
-- [app/agents/writer_agent.py](D:/workspace/github/deerflow-lite/app/agents/writer_agent.py)
 - [app/subagents/runner.py](D:/workspace/github/deerflow-lite/app/subagents/runner.py)
 - [app/subagents/rendering.py](D:/workspace/github/deerflow-lite/app/subagents/rendering.py)
 - [app/tools/reporting.py](D:/workspace/github/deerflow-lite/app/tools/reporting.py)

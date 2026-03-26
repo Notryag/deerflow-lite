@@ -44,7 +44,7 @@ User Task
 - shell / python execution
 - research notes / final report 产出
 
-固定 `ResearchAgent` / `WriterAgent` 这类角色 MAY 在迁移期作为参考实现保留，但 MUST NOT 作为目标架构中的长期能力承载点。
+固定 `ResearchAgent` / `WriterAgent` 这类角色 MUST NOT 作为目标架构中的长期能力承载点。
 
 ## 2. Required Directory Layout
 
@@ -92,7 +92,6 @@ tests/
 - `python_exec.py` 可以是 stub，但模块路径应预留
 - `api/` 不在当前强制目录内
 - `schemas/` 只有在实现中有明确独立价值时再引入
-- 当前仓库里的 `orchestrator.py`、`research_agent.py`、`writer_agent.py` 可作为迁移参考，但不是目标终态
 - `langchain_toolset.py` 用于把能力函数包装成可挂载的 `@tool`
 - `reporting.py` 是将 research / report 能力收敛到 tool 层的迁移方向
 
@@ -268,9 +267,8 @@ SUBAGENT_TIMEOUT_SECONDS=900
 
 当前参考实现仍保留以下旧版工程取舍：
 
-- 主 workflow 已不再依赖固定 `orchestrator -> research -> writer` 链路
+- 主 workflow 已简化为 `lead_agent -> optional task/subagent -> reporting`
 - 复杂任务 fallback 会直接创建 `general-purpose` subagent，再由 tool/helper 产出 notes / report
-- `orchestrator.py` 仍保留在仓库中作为 legacy planning 参考实现
 - retrieval 使用本地 deterministic embedding 和 JSON vector store 作为 MVP 默认实现
 - 没有模型配置时，lead agent 与 subagent 会统一落到本地 fake tool-calling model，但对外 contract 不变
 - `subagent runner` 已改为真实 `create_agent(..., tools=[...])` 执行，而不是程序化脚本 worker

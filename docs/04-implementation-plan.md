@@ -26,7 +26,7 @@
 
 - 保持当前 CLI 可运行
 - 保持现有 workspace / retrieval / 基础测试可用
-- 明确旧版 `orchestrator -> research -> writer` 只是迁移起点
+- 明确旧版固定流水线只是迁移起点
 
 阶段完成条件：
 
@@ -125,7 +125,7 @@ AI CLI 或自动化实现时，必须遵守以下规则：
 - 不得引入 `langchain_classic`
 - 不得把业务主流程改成 LCEL chain 串联
 - 对暂未完成能力，使用 stub 而不是跳过接口
-- 不得把固定 `research_agent` / `writer_agent` 重新定义成目标终态
+- 不得把固定专用 agent 重新定义成目标终态
 
 ## 4. Delivery Contract
 
@@ -156,7 +156,7 @@ AI CLI 或自动化实现时，必须遵守以下规则：
 - 项目骨架
 - `RunState`、workspace、logger
 - file tools、retrieval pipeline、retrieval tool
-- 旧版 `orchestrator`、`research_agent`、`writer_agent`
+- 旧版固定流水线残留
 - 旧版 `run_task` workflow
 - CLI 入口
 - 基础测试

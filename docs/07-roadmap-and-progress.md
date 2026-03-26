@@ -19,8 +19,8 @@
 - 本地无 API 时，lead agent 和 subagent 统一复用 fake tool-calling model，而不是单独的程序化 stub 分支
 - `subagent executor` 已补上批量并发上限检查和 nested delegation contract 校验
 - `subagent executor` 已补上线程池调度加子进程 worker、timeout 结果回填
-- 主 workflow 对复杂任务已经直接创建 `general-purpose` subagent，不再依赖固定 `orchestrator -> research -> writer` 链路
-- `app/subagents/rendering.py` 已落地第一版共享 helper 层，research / report 产出逻辑开始同时服务 legacy agent 和 subagent runtime
+- 主 workflow 已收敛为 `lead_agent + subagent executor + reporting`
+- `app/subagents/rendering.py` 已落地第一版共享 helper 层，research / report 产出逻辑服务主流程和 subagent runtime
 - `app/tools/reporting.py` 已承接 fallback workflow 的 notes / final report 产出
 - middleware / tool 边界已经记入主规范：middleware 只管上下文与约束，能力和业务决策必须回到 tool-calling
 - `app/tools/langchain_toolset.py` 已把 retrieval / web / file / python / task 封装成可挂载的 `@tool` 集合，并接到 `lead_agent` 真实模型路径
@@ -36,7 +36,7 @@
 
 - `python -m unittest discover -s tests -v` 已通过
 - 当前共有 `42` 个测试通过
-- 新架构已具备 `T1` 到 `T4` 的更完整验证，`T5` 已进入“去除固定 legacy agent 主流程依赖”的第二轮迁移
+- 新架构已具备 `T1` 到 `T4` 的更完整验证，当前重点转为继续压缩非主链代码
 
 ## 2. Progress By Track
 
@@ -52,7 +52,7 @@
 | lead agent runtime | in_progress | 88% | lead 与本地 fake model 已统一走 `create_agent(..., tools=[...])`，剩余工作主要是继续清理 legacy 参考实现 |
 | task tool / registry | completed | 100% | registry、task tool、lead-agent wiring 已打通 |
 | subagent executor | in_progress | 96% | 已有线程池调度、子进程 agent worker、timeout 终止、并发上限检查、nested delegation 校验，并已切到真实 tool-calling runtime |
-| legacy logic migration | in_progress | 85% | 主 workflow 已摆脱固定 `research/writer` 依赖，主缺口变成移除 `orchestrator` 的残留参考地位 |
+| legacy logic migration | in_progress | 96% | 旧版专用 agent 已删除，剩余主要是进一步简化 helper 和文档 |
 | web search | pending | 20% | 当前仍为 stub |
 | python exec | pending | 15% | 已有基础函数，未纳入新架构 |
 | 运行健壮性 | pending | 20% | 新架构的 timeout、manifest、失败恢复尚未实现 |
@@ -62,7 +62,7 @@
 
 建议按以下顺序继续：
 
-1. 继续清理 legacy 参考实现，把 `orchestrator` / `research_agent` / `writer_agent` 的残留地位进一步边缘化
+1. 保持主流程最小可跑，只在这条主链上逐步增加 tool 和 middleware
 2. 再做真实 `search_web` provider 和受控执行能力
 3. 补强 subagent 的多轮工具能力与观测记录
 4. 最后再考虑 API
@@ -111,7 +111,7 @@ Status: `completed`
 
 目标：
 
-- 用 `lead_agent` 取代固定 orchestrator / research / writer 终态设计
+- 用 `lead_agent` 取代固定多段式专用 agent 终态设计
 
 子任务：
 
@@ -200,8 +200,8 @@ Status: `in_progress`
 
 目标：
 
-- 把现有 `research_agent` / `writer_agent` 中能复用的逻辑迁移为共享 helper
-- 让 research / report 渲染逻辑同时服务 legacy agent 和 subagent runtime
+- 把 research / report 中能复用的逻辑迁移为共享 helper
+- 让 research / report 渲染逻辑服务主流程和 subagent runtime
 
 子任务：
 
@@ -209,13 +209,13 @@ Status: `in_progress`
 - 提取 evidence 归一化和 markdown 渲染逻辑
 - 让 subagent runner 复用相同的 report helper
 - 继续提取 prompt 模板和最终汇总逻辑
-- 用 tool / helper 替换 workflow 中剩余的固定 `ResearchAgent` / `WriterAgent` 依赖
-- 清理固定三段式依赖
+- 用 tool / helper 替换 workflow 中剩余的固定专用 agent 依赖
+- 清理固定流水线残留
 
 完成定义：
 
 - 旧版固定角色代码不再独占 report / research 渲染逻辑
-- legacy agent 和 subagent runtime 复用同一组 helper
+- 主流程和 subagent runtime 复用同一组 helper
 - 可复用逻辑被保留而不是丢失
 
 当前结果：
@@ -223,13 +223,12 @@ Status: `in_progress`
 - 已新增 `app/subagents/rendering.py`
 - 已新增 `app/tools/reporting.py`
 - `general-purpose` 默认上限已提升到 `50` turns，`bash` 提升到 `30` turns
-- `research_agent` 与 `writer_agent` 已改为复用共享 helper
 - `runner.py` 已复用共享 subagent summary / artifact 渲染逻辑
 - `run_task` 的 fallback research / final report 产出已改走 `reporting.py`
 - `run_task` 的复杂任务 fallback 已直接创建 `general-purpose` subagent
 - executor 已会按 registry 过滤 subagent runtime tools，并把工具面写入 result artifact
 - subagent runtime 已切到真实模型驱动 tool-calling worker
-- 共享层目前已覆盖数据形状、summary、markdown 渲染和 prompt 模板；主缺口是继续收口 legacy agent 的残留角色定位
+- 共享层目前已覆盖数据形状、summary、markdown 渲染和 prompt 模板；主缺口是继续压缩非主链代码
 
 ### T6. Real Web Search And Controlled Execution
 
@@ -270,14 +269,13 @@ Status: `deferred`
 
 ## 5. Current Focus Recommendation
 
-如果下一步只做一个主题，优先继续做 `T5. Legacy Logic Migration`。
+如果下一步只做一个主题，优先继续做“主流程最小化收口”。
 
 理由：
 
-- delegation 主链已经打通，executor 也已经具备基础可控性
-- prompt 模板和 fallback 产出已经开始 tool 化，下一步最有价值的是继续清理程序侧 heuristics
-- 这样后续接真实 tool/provider 时，workflow 和 subagent runtime 都能沿用同一套输出 contract
-- 先统一产出层，再扩工具层，能减少后续重构次数
+- `lead_agent + subagent executor + reporting` 已经构成最小可跑主链
+- 先稳住这条主链，再逐步增加 tool 和 middleware，重构成本最低
+- 继续保留旧节点只会增加理解和维护负担
 
 ## 6. Progress Update Rule
 
