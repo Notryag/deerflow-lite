@@ -16,7 +16,7 @@
 - `lead_agent` 已接入简单任务直答路径
 - `task` 工具、`subagent registry` 和最小 `subagent executor` 已完成第一轮实现与测试
 - `lead_agent` 在真实模型路径下已改为通过 `task` tool-calling 决定是否委派
-- stub 路径仍保留少量 heuristics 作为 fallback
+- stub 路径已收窄为极小的 deterministic 直答能力，复杂任务不再由程序 heuristics 做委派/搜索判断
 - `subagent executor` 已补上批量并发上限检查和 nested delegation contract 校验
 - `subagent executor` 已补上线程池调度加子进程 worker、timeout 结果回填
 - `app/subagents/builtins.py` 已作为内置 worker 实现落地
@@ -47,7 +47,7 @@
 | lead agent skeleton | completed | 100% | 简单任务可直答，复杂任务可落到 fallback subagent 路径 |
 | 本地 retrieval | completed | 85% | MVP 可用，质量和索引策略仍可加强 |
 | file tools | completed | 90% | 安全校验和测试已具备 |
-| lead agent runtime | in_progress | 65% | 真实模型路径已切到 tool-calling delegation，workflow 侧 web-search heuristics 已移除，stub 路径仍有 fallback heuristics |
+| lead agent runtime | in_progress | 70% | 真实模型路径已切到 tool-calling delegation，workflow 侧 web-search heuristics 已移除，stub 路径仅保留极小直答能力 |
 | task tool / registry | completed | 100% | registry、task tool、lead-agent wiring 已打通 |
 | subagent executor | in_progress | 85% | 已有线程池调度、子进程 worker、timeout 终止、并发上限检查、nested delegation 校验 |
 | legacy logic migration | in_progress | 85% | 主 workflow 已摆脱固定 `research/writer` 依赖，主缺口变成移除 `orchestrator` 的残留参考地位 |
@@ -60,7 +60,7 @@
 
 建议按以下顺序继续：
 
-1. 继续清理程序侧 heuristics，把检索、搜索等决策彻底并入 lead-agent / subagent 的 tool-calling 路径
+1. 继续清理程序侧 heuristics，把 retrieval 等剩余能力逐步接回 lead-agent / subagent 的 tool-calling 路径
 2. 再做真实 `search_web` provider 和受控执行能力
 3. 为 subagent 增加更真实的 worker 能力和工具接入
 4. 最后再考虑 API

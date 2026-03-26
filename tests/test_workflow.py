@@ -54,8 +54,9 @@ class WorkflowTests(unittest.TestCase):
             self.assertEqual(len(state.subagent_results), 1)
             self.assertTrue((workspace / "subagents" / "task_001" / "result.md").exists())
             self.assertTrue((workspace / "outputs" / "final.md").exists())
-            self.assertFalse((workspace / "notes" / "research.md").exists())
+            self.assertTrue((workspace / "notes" / "research.md").exists())
             self.assertIn("subagents/task_001/result.md", state.artifact_files)
+            self.assertIn("notes/research.md", state.artifact_files)
             self.assertTrue(bool(state.final_answer))
 
     def test_run_task_creates_workspace_notes_and_final_output(self) -> None:
@@ -84,6 +85,8 @@ class WorkflowTests(unittest.TestCase):
             self.assertEqual(state.status, "completed")
             self.assertTrue(bool(state.trace_id))
             self.assertEqual(state.task_type, "delegated_response")
+            self.assertFalse(state.needs_retrieval)
+            self.assertEqual(state.retrieved_docs, [])
             self.assertEqual(len(state.subagent_tasks), 1)
             self.assertEqual(len(state.subagent_results), 1)
             self.assertTrue((workspace / "notes" / "research.md").exists())

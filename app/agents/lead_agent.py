@@ -11,11 +11,7 @@ from app.config.settings import Settings
 from app.runtime.state import RunState
 from app.runtime.workspace import Workspace
 from app.subagents.executor import SubagentExecutor
-from app.subagents.rendering import (
-    build_delegated_final_answer,
-    build_delegated_final_sections,
-    build_lead_prompt,
-)
+from app.subagents.rendering import build_lead_prompt
 from app.tools.task_tool import TaskTool
 
 
@@ -38,13 +34,8 @@ class LeadAgent:
         self.settings = settings
 
     def run(self, state: RunState, workspace: Workspace) -> RunState:
-        if state.data_dir:
-            return state
-
         if use_stub_agents(self.settings):
-            if self._should_delegate(state):
-                return self._delegate_task(state, workspace)
-            if not self._should_answer_directly(state):
+            if not self._can_answer_in_stub(state):
                 return state
             output = self._stub_output(state)
         else:
@@ -52,104 +43,12 @@ class LeadAgent:
 
         return self._persist_output(state, workspace, output)
 
-    def _should_answer_directly(self, state: RunState) -> bool:
+    @staticmethod
+    def _can_answer_in_stub(state: RunState) -> bool:
         if state.data_dir:
             return False
-
-        lower_task = state.user_task.lower()
-        complex_tokens = (
-            "summarize",
-            "summary",
-            "report",
-            "research",
-            "analyze",
-            "analysis",
-            "compare",
-            "docs",
-            "document",
-            "file",
-            "search",
-            "web",
-            "latest",
-            "recent",
-            "retrieve",
-            "rag",
-            "python",
-            "code",
-            "script",
-            "目录",
-            "总结",
-            "资料",
-            "联网",
-            "脚本",
-        )
-        return not any(token in lower_task for token in complex_tokens)
-
-    def _should_delegate(self, state: RunState) -> bool:
-        if state.data_dir:
-            return False
-        lower_task = state.user_task.lower()
-        delegation_tokens = (
-            "delegate",
-            "subagent",
-            "break down",
-            "investigate",
-            "inspect",
-            "analyze",
-            "analysis",
-            "plan",
-        )
-        blocked_tokens = (
-            "latest",
-            "recent",
-            "search",
-            "web",
-            "python",
-            "code",
-            "script",
-            "联网",
-            "资料",
-            "脚本",
-        )
-        return any(token in lower_task for token in delegation_tokens) and not any(
-            token in lower_task for token in blocked_tokens
-        )
-
-    def _delegate_task(self, state: RunState, workspace: Workspace) -> RunState:
-        task_tool = TaskTool(state, workspace)
-        task_result = task_tool.create_task(
-            description=f"Handle delegated request: {state.user_task}",
-            prompt=(
-                "Work only inside the shared workspace. "
-                "Return a concise summary and write a result artifact for the parent agent. "
-                f"User task: {state.user_task}"
-            ),
-        )
-        result = SubagentExecutor(self.settings).execute_task(state, workspace, task_result["task_id"])
-
-        output = LeadAgentOutput(
-            final_answer=build_delegated_final_answer(),
-            sections=build_delegated_final_sections(
-                state.user_task,
-                str(task_result["task_id"]),
-                str(task_result["subagent_type"]),
-                str(result["summary"]),
-            ),
-        )
-        path = workspace.write_text("outputs/final.md", render_lead_markdown(output))
-        relative = str(path.relative_to(workspace.thread_dir)).replace("\\", "/")
-        if relative not in state.output_files:
-            state.output_files.append(relative)
-        state.add_artifact_file(relative)
-        state.final_answer = output.final_answer
-        state.task_type = "delegated_response"
-        if not state.plan:
-            state.plan = [
-                "create a delegated subagent task",
-                "collect the structured subagent result",
-                "write the final report from delegated output",
-            ]
-        return state
+        lower_task = state.user_task.lower().strip()
+        return lower_task in {"hi", "hello", "hey"} or lower_task.startswith("say hello")
 
     def _persist_output(self, state: RunState, workspace: Workspace, output: LeadAgentOutput) -> RunState:
         path = workspace.write_text("outputs/final.md", render_lead_markdown(output))

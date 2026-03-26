@@ -80,7 +80,7 @@ class RunState(BaseModel):
 - `lead_agent` MUST 通过 `task` 工具发起 subagent
 - `lead_agent` MUST 记录 plan、subagent 调用和最终输出
 - `lead_agent` 必须区分“来自工具或 artifact 的事实”和“模型综合结论”
-- Python 侧 MAY 提供 stub fallback，但 MUST NOT 把 heuristics 当作真实模型路径中的主决策机制
+- Python 侧 MAY 提供极小的 stub fallback 直答能力，但 MUST NOT 把 heuristics 当作真实模型路径中的主决策机制
 
 ## 4. Task Tool Contract
 
