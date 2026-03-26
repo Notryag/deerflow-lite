@@ -24,6 +24,7 @@
 - `app/subagents/rendering.py` 已落地第一版共享 helper 层，research / report 产出逻辑开始同时服务 legacy agent 和 subagent runtime
 - `app/tools/reporting.py` 已承接 fallback workflow 的 notes / final report 产出
 - middleware / tool 边界已经记入主规范：middleware 只管上下文与约束，能力和业务决策必须回到 tool-calling
+- `app/tools/langchain_toolset.py` 已把 retrieval / web / file / python / task 封装成可挂载的 `@tool` 集合，并接到 `lead_agent` 真实模型路径
 - CLI MVP 仍可运行
 - 本地 retrieval 已可用
 - stub agent 路径可用
@@ -33,7 +34,7 @@
 当前验证状态：
 
 - `python -m unittest discover -s tests -v` 已通过
-- 当前共有 `35` 个测试通过
+- 当前共有 `38` 个测试通过
 - 新架构已具备 `T1` 到 `T4` 的更完整验证，`T5` 已进入“去除固定 legacy agent 主流程依赖”的第二轮迁移
 
 ## 2. Progress By Track
@@ -47,7 +48,7 @@
 | lead agent skeleton | completed | 100% | 简单任务可直答，复杂任务可落到 fallback subagent 路径 |
 | 本地 retrieval | completed | 85% | MVP 可用，质量和索引策略仍可加强 |
 | file tools | completed | 90% | 安全校验和测试已具备 |
-| lead agent runtime | in_progress | 70% | 真实模型路径已切到 tool-calling delegation，workflow 侧 web-search heuristics 已移除，stub 路径仅保留极小直答能力 |
+| lead agent runtime | in_progress | 75% | 真实模型路径已切到完整 tool bundle，workflow 侧 web-search heuristics 已移除，stub 路径仅保留极小直答能力 |
 | task tool / registry | completed | 100% | registry、task tool、lead-agent wiring 已打通 |
 | subagent executor | in_progress | 85% | 已有线程池调度、子进程 worker、timeout 终止、并发上限检查、nested delegation 校验 |
 | legacy logic migration | in_progress | 85% | 主 workflow 已摆脱固定 `research/writer` 依赖，主缺口变成移除 `orchestrator` 的残留参考地位 |

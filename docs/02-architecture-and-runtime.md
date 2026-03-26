@@ -61,6 +61,7 @@ app/
     builtins.py
   tools/
     task_tool.py
+    langchain_toolset.py
     reporting.py
     retrieval.py
     web_search.py
@@ -91,6 +92,7 @@ tests/
 - `api/` 不在当前强制目录内
 - `schemas/` 只有在实现中有明确独立价值时再引入
 - 当前仓库里的 `orchestrator.py`、`research_agent.py`、`writer_agent.py` 可作为迁移参考，但不是目标终态
+- `langchain_toolset.py` 用于把能力函数包装成可挂载的 `@tool`
 - `reporting.py` 是将 research / report 能力收敛到 tool 层的迁移方向
 
 ## 3. Runtime Flow

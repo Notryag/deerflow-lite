@@ -1,18 +1,13 @@
 from __future__ import annotations
 
-import json
-from typing import Literal
-
-from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 
 from app.agents.common import build_chat_model, build_context, use_stub_agents
 from app.config.settings import Settings
 from app.runtime.state import RunState
 from app.runtime.workspace import Workspace
-from app.subagents.executor import SubagentExecutor
 from app.subagents.rendering import build_lead_prompt
-from app.tools.task_tool import TaskTool
+from app.tools.langchain_toolset import build_langchain_tools
 
 
 class LeadAgentOutput(BaseModel):
@@ -89,15 +84,13 @@ class LeadAgent:
 
         context = build_context(state, workspace)
 
-        task_tool = self._build_task_tool(state, workspace)
-
         @dynamic_prompt
         def inject_context(request):
             return build_lead_prompt(context)
 
         agent = create_agent(
             model=build_chat_model(self.settings),
-            tools=[task_tool],
+            tools=build_langchain_tools(state, workspace, self.settings, include_task=True),
             middleware=[inject_context],
             response_format=LeadAgentOutput,
             name="deerflow_lite_lead",
@@ -107,52 +100,3 @@ class LeadAgent:
         if isinstance(structured, LeadAgentOutput):
             return structured
         return LeadAgentOutput.model_validate(structured)
-
-    def _build_task_tool(self, state: RunState, workspace: Workspace):
-        task_tool_impl = TaskTool(state, workspace)
-        executor = SubagentExecutor(self.settings)
-
-        @tool("task", parse_docstring=True)
-        def delegate_task(
-            description: str,
-            prompt: str,
-            subagent_type: Literal["general-purpose", "bash"],
-            max_turns: int | None = None,
-        ) -> str:
-            """Delegate a task to a specialized subagent that runs in its own context.
-
-            Subagents help you:
-            - Preserve context by keeping exploration and implementation separate
-            - Handle complex multi-step tasks autonomously
-            - Execute commands or operations in isolated contexts
-
-            Available subagent types:
-            - general-purpose: Use for complex, multi-step tasks that require reasoning or synthesis.
-            - bash: Use for command-heavy tasks or cases where command output would be verbose.
-
-            When to use this tool:
-            - Complex tasks requiring multiple steps or tools
-            - Tasks that produce verbose output
-            - When you want to isolate context from the main conversation
-
-            When NOT to use this tool:
-            - Simple, single-step operations
-            - Tasks requiring user clarification
-
-            Args:
-                description: A short 3-5 word description of the delegated task.
-                prompt: A specific self-contained prompt for the subagent.
-                subagent_type: The subagent type to use.
-                max_turns: Optional maximum number of turns for the subagent.
-            """
-
-            task = task_tool_impl.create_task(
-                description=description,
-                prompt=prompt,
-                subagent_type=subagent_type,
-                max_turns=max_turns,
-            )
-            result = executor.execute_task(state, workspace, task["task_id"])
-            return json.dumps(result, ensure_ascii=True)
-
-        return delegate_task

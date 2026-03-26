@@ -36,13 +36,14 @@
 3. [app/runtime/state.py](D:/workspace/github/deerflow-lite/app/runtime/state.py)
 4. [app/runtime/workspace.py](D:/workspace/github/deerflow-lite/app/runtime/workspace.py)
 5. [app/agents/lead_agent.py](D:/workspace/github/deerflow-lite/app/agents/lead_agent.py)
-6. [app/tools/task_tool.py](D:/workspace/github/deerflow-lite/app/tools/task_tool.py)
-7. [app/subagents/registry.py](D:/workspace/github/deerflow-lite/app/subagents/registry.py)
-8. [app/subagents/rendering.py](D:/workspace/github/deerflow-lite/app/subagents/rendering.py)
-9. [app/subagents/builtins.py](D:/workspace/github/deerflow-lite/app/subagents/builtins.py)
-10. [app/tools/reporting.py](D:/workspace/github/deerflow-lite/app/tools/reporting.py)
-11. [app/subagents/executor.py](D:/workspace/github/deerflow-lite/app/subagents/executor.py)
-12. [tests/test_workflow.py](D:/workspace/github/deerflow-lite/tests/test_workflow.py)
+6. [app/tools/langchain_toolset.py](D:/workspace/github/deerflow-lite/app/tools/langchain_toolset.py)
+7. [app/tools/task_tool.py](D:/workspace/github/deerflow-lite/app/tools/task_tool.py)
+8. [app/subagents/registry.py](D:/workspace/github/deerflow-lite/app/subagents/registry.py)
+9. [app/subagents/rendering.py](D:/workspace/github/deerflow-lite/app/subagents/rendering.py)
+10. [app/subagents/builtins.py](D:/workspace/github/deerflow-lite/app/subagents/builtins.py)
+11. [app/tools/reporting.py](D:/workspace/github/deerflow-lite/app/tools/reporting.py)
+12. [app/subagents/executor.py](D:/workspace/github/deerflow-lite/app/subagents/executor.py)
+13. [tests/test_workflow.py](D:/workspace/github/deerflow-lite/tests/test_workflow.py)
 
 ## 2. Code Entry Points
 
@@ -194,6 +195,18 @@
 - 校验 `description`、`prompt`、`subagent_type`、`max_turns`
 - 将 task 记录到 `RunState.subagent_tasks`
 - 将 task 写入 `subagents/manifest.json`
+
+### LangChain Toolset
+
+文件：
+
+- [app/tools/langchain_toolset.py](D:/workspace/github/deerflow-lite/app/tools/langchain_toolset.py)
+
+职责：
+
+- 把 retrieval / web / file / python / task 能力包装成可挂载的 `@tool`
+- 绑定 `RunState`、`Workspace` 和 `Settings`
+- 为真实模型路径提供统一 tool bundle
 
 ### Subagent Registry
 
@@ -379,6 +392,7 @@
 - [test_retrieval.py](D:/workspace/github/deerflow-lite/tests/test_retrieval.py): retrieval 输出结构
 - [test_subagent_registry.py](D:/workspace/github/deerflow-lite/tests/test_subagent_registry.py): registry 类型和 `max_turns` 校验
 - [test_task_tool.py](D:/workspace/github/deerflow-lite/tests/test_task_tool.py): task 创建、manifest 写入、参数校验
+- [test_langchain_toolset.py](D:/workspace/github/deerflow-lite/tests/test_langchain_toolset.py): 完整 tool bundle 暴露、检索和搜索 tool 的 state 回填
 - [test_subagent_executor.py](D:/workspace/github/deerflow-lite/tests/test_subagent_executor.py): executor 执行、批量执行、timeout、并发上限与 nested delegation 校验
 - [test_orchestrator.py](D:/workspace/github/deerflow-lite/tests/test_orchestrator.py): 旧版 orchestrator 决策
 - [test_reporting_tool.py](D:/workspace/github/deerflow-lite/tests/test_reporting_tool.py): reporting tool 落盘与 state 更新
