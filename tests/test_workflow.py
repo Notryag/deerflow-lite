@@ -14,7 +14,6 @@ class WorkflowTests(unittest.TestCase):
             root = Path(tmp)
             settings = Settings(
                 runtime_dir=root / "runtime",
-                vector_db_dir=root / "vectors",
                 use_stub_agents=True,
             )
             state = run_task(
@@ -38,7 +37,6 @@ class WorkflowTests(unittest.TestCase):
             root = Path(tmp)
             settings = Settings(
                 runtime_dir=root / "runtime",
-                vector_db_dir=root / "vectors",
                 use_stub_agents=True,
             )
             state = run_task(
@@ -71,7 +69,6 @@ class WorkflowTests(unittest.TestCase):
 
             settings = Settings(
                 runtime_dir=root / "runtime",
-                vector_db_dir=root / "vectors",
                 use_stub_agents=True,
             )
             state = run_task(
@@ -85,10 +82,9 @@ class WorkflowTests(unittest.TestCase):
             self.assertEqual(state.status, "completed")
             self.assertTrue(bool(state.trace_id))
             self.assertEqual(state.task_type, "delegated_response")
-            self.assertFalse(state.needs_retrieval)
-            self.assertEqual(state.retrieved_docs, [])
             self.assertEqual(len(state.subagent_tasks), 1)
             self.assertEqual(len(state.subagent_results), 1)
+            self.assertTrue((workspace / "workspace" / "data" / "notes.md").exists())
             self.assertTrue((workspace / "notes" / "research.md").exists())
             self.assertTrue((workspace / "outputs" / "final.md").exists())
             self.assertTrue((workspace / "subagents" / "manifest.json").exists())

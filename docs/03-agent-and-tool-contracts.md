@@ -41,7 +41,6 @@ class RunState(BaseModel):
     subagent_tasks: list[dict] = Field(default_factory=list)
     subagent_results: list[dict] = Field(default_factory=list)
 
-    retrieved_docs: list[dict] = Field(default_factory=list)
     search_results: list[dict] = Field(default_factory=list)
 
     artifact_files: list[str] = Field(default_factory=list)
@@ -129,14 +128,13 @@ class RunState(BaseModel):
 
 middleware 的职责仅限于：
 
-- 注入 task / workspace / retrieval / subagent 摘要
+- 注入 task / workspace / search / subagent 摘要
 - 注入安全约束和系统级提示
 - 承载 trace / logging 所需元数据
 
 middleware MUST NOT：
 
 - 决定是否调用 `search_web`
-- 决定是否调用 `retrieve_knowledge`
 - 决定是否读写文件
 - 决定是否委派 subagent
 
@@ -194,7 +192,6 @@ registry MUST 提供稳定的类型到配置映射。
   "max_turns": 50,
   "timeout_seconds": 900,
   "allowed_tools": [
-    "retrieve_knowledge",
     "search_web",
     "read_file",
     "write_file",
@@ -236,32 +233,7 @@ executor MUST 负责 subagent 生命周期管理。
 - executor SHOULD 按 registry 解析 subagent 的实际 runtime tool bundle
 - executor SHOULD 只负责生命周期控制，不应替 subagent 决定何时调用具体工具
 
-## 8. Retrieval Tool Contract
-
-### 8.1 Signature
-
-`retrieve_knowledge(query, top_k=3, collection_name=None) -> list[dict]`
-
-### 8.2 Output Shape
-
-每条记录必须包含：
-
-```python
-{
-  "content": "...",
-  "source": "...",
-  "score": 0.87,
-  "metadata": {}
-}
-```
-
-### 8.3 Rules
-
-- retrieval 必须作为 tool 存在
-- 不得硬编码到主 prompt 前缀里
-- `top_k` 默认值为 `3`
-
-## 8.4 Reporting Tool Contract
+## 8. Reporting Tool Contract
 
 research notes 和 final report 的产出 SHOULD 通过 tool / helper 层完成，而不是依赖固定专用 agent 节点。
 

@@ -56,7 +56,7 @@
 
 ## Architecture Direction
 
-`deerflow-lite` 的当前目标是做一个偏 `agentic RAG / research / tool calling / delegated execution` 的本地优先 MVP：
+`deerflow-lite` 的当前目标是做一个偏 `lead agent / subagent / tool calling / delegated execution` 的本地优先 MVP：
 
 - CLI 优先，API 延后
 - `Lead Agent + task/subagent` 优先，不再把固定三段式当作目标终态
@@ -66,10 +66,11 @@
 
 ## Current Implementation
 
-当前仓库已经包含一个可运行的旧版 MVP 骨架，但实现仍停留在固定 `orchestrator -> research -> writer` 流程：
+当前仓库已经收敛到一条更小的可运行主链：
 
 - CLI: `python -m app.cli.main run "...task..." --data-dir ./docs`
 - 测试: `python -m unittest discover -s tests -v`
-- 默认行为: 没有模型配置时走本地 stub agents；retrieval 使用本地 deterministic embedding 和 JSON vector store
+- 默认行为: 没有模型配置时走本地 fake tool-calling model
+- `data_dir` 会被复制到 `workspace/data/`，subagent 通过文件工具直接读取
 - 使用真实模型时，确保 `.env` 中 `USE_STUB_AGENTS=false`
-- `docs/01-05` 现在描述的是目标中的 subagent 架构，`docs/08` 则说明当前代码与目标之间的差距
+- 当前主流程是 `lead_agent -> optional task/subagent -> reporting`

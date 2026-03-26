@@ -80,8 +80,6 @@ class SubagentExecutor:
             "trace_id": state.trace_id,
             "runtime_dir": str(workspace.runtime_dir),
             "workspace_dir": str(workspace.thread_dir),
-            "data_dir": state.data_dir,
-            "vector_db_dir": str(self.settings.vector_db_dir),
             "user_task": state.user_task,
         }
         effective_timeout = min(

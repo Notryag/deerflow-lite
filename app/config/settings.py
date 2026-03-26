@@ -24,8 +24,6 @@ class Settings:
     openai_api_key: str = ""
     openai_base_url: str = ""
     model_name: str = "gpt-4.1-mini"
-    embedding_model: str = "simple-hash"
-    vector_db_dir: Path = Path(".cache/vectorstore")
     runtime_dir: Path = Path("./runtime")
     web_search_provider: str = "stub"
     subagent_max_concurrency: int = 3
@@ -41,8 +39,6 @@ class Settings:
             openai_api_key=openai_api_key,
             openai_base_url=os.getenv("OPENAI_BASE_URL", ""),
             model_name=os.getenv("MODEL_NAME", "gpt-4.1-mini"),
-            embedding_model=os.getenv("EMBEDDING_MODEL", "simple-hash"),
-            vector_db_dir=Path(os.getenv("VECTOR_DB_DIR", ".cache/vectorstore")),
             runtime_dir=Path(os.getenv("RUNTIME_DIR", "./runtime")),
             web_search_provider=os.getenv("WEB_SEARCH_PROVIDER", "stub"),
             subagent_max_concurrency=_as_int(os.getenv("SUBAGENT_MAX_CONCURRENCY"), 3),

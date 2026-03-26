@@ -17,7 +17,7 @@ class ReportingToolTests(unittest.TestCase):
                 thread_id="thread-reporting-tool",
                 user_task="Summarize the local documents.",
                 task_type="research_report",
-                retrieved_docs=[{"source": "docs/02", "content": "Lead Agent delegates complex work."}],
+                search_results=[{"source": "web", "snippet": "Lead Agent delegates complex work."}],
             )
 
             notes = write_research_notes(state, workspace)

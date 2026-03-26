@@ -28,16 +28,16 @@ class ReportingHelpersTests(unittest.TestCase):
             thread_id="thread-reporting",
             user_task="Summarize the available materials.",
             task_type="research_report",
-            retrieved_docs=[{"source": "docs/02", "content": "Lead Agent delegates complex work."}],
+            search_results=[{"source": "web", "snippet": "Lead Agent delegates complex work."}],
         )
 
         notes = build_research_notes_from_state(state)
 
         self.assertEqual(notes.user_task, "Summarize the available materials.")
         self.assertIn("Task type: research_report", notes.key_findings)
-        self.assertIn("Local retrieval was used.", notes.key_findings)
+        self.assertIn("Web search was used.", notes.key_findings)
         self.assertEqual(notes.open_questions, [])
-        self.assertIn("docs/02: Lead Agent delegates complex work.", notes.evidence)
+        self.assertIn("web: Lead Agent delegates complex work.", notes.evidence)
 
     def test_research_builder_includes_subagent_summary(self) -> None:
         state = RunState(

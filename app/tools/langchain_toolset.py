@@ -11,7 +11,6 @@ from app.runtime.state import RunState
 from app.runtime.workspace import Workspace
 from app.tools.file_ops import FileOpsToolset
 from app.tools.python_exec import run_python_code
-from app.tools.retrieval import retrieve_knowledge
 from app.tools.task_tool import TaskTool
 from app.tools.web_search import search_web
 
@@ -26,28 +25,6 @@ def build_langchain_tools(
 ) -> list[object]:
     file_ops = FileOpsToolset(workspace)
     task_tool_impl = TaskTool(state, workspace)
-
-    @tool("retrieve_knowledge", parse_docstring=True)
-    def retrieve_knowledge_tool(query: str, top_k: int = 3) -> str:
-        """Retrieve relevant local context from the configured data directory.
-
-        Args:
-            query: The search query for local retrieval.
-            top_k: Maximum number of retrieved chunks to return.
-        """
-
-        if not state.data_dir:
-            raise ValueError("retrieve_knowledge requires a configured data_dir")
-        results = retrieve_knowledge(
-            query=query,
-            data_dir=state.data_dir,
-            settings=settings,
-            top_k=top_k,
-            collection_name=state.thread_id,
-        )
-        state.needs_retrieval = True
-        state.retrieved_docs = results
-        return json.dumps(results, ensure_ascii=True)
 
     @tool("search_web", parse_docstring=True)
     def search_web_tool(query: str, top_k: int = 5) -> str:
@@ -107,7 +84,6 @@ def build_langchain_tools(
         return json.dumps(result, ensure_ascii=True)
 
     tools: list[object] = [
-        retrieve_knowledge_tool,
         search_web_tool,
         read_file_tool,
         write_file_tool,

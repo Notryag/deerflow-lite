@@ -13,24 +13,20 @@ class AgentContext:
     task_summary: str
     state_summary: str
     workspace_summary: str
-    retrieved_summary: str
     search_summary: str
 
 
 def build_context(state: RunState, workspace: Workspace) -> AgentContext:
     state_summary = (
         f"task_type={state.task_type or 'unknown'}; "
-        f"needs_retrieval={state.needs_retrieval}; "
         f"needs_web_search={state.needs_web_search}; "
         f"needs_python={state.needs_python}; "
-        f"retrieved_docs={len(state.retrieved_docs)}; "
         f"search_results={len(state.search_results)}"
     )
     return AgentContext(
         task_summary=state.user_task,
         state_summary=state_summary,
         workspace_summary=workspace.summarize(),
-        retrieved_summary=_summarize_items(state.retrieved_docs, content_key="content"),
         search_summary=_summarize_items(state.search_results, content_key="snippet"),
     )
 
@@ -45,7 +41,6 @@ def format_context_block(context: AgentContext) -> str:
         f"- task: {context.task_summary}\n"
         f"- state: {context.state_summary}\n"
         f"- workspace:\n{context.workspace_summary}\n"
-        f"- retrieved materials:\n{context.retrieved_summary}\n"
         f"- web results:\n{context.search_summary}"
     )
 

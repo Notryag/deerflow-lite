@@ -11,7 +11,7 @@ class SubagentRegistryTests(unittest.TestCase):
         spec = registry.get("general-purpose")
         self.assertEqual(spec.name, "general-purpose")
         self.assertEqual(spec.max_turns, 50)
-        self.assertIn("retrieve_knowledge", spec.allowed_tools)
+        self.assertIn("search_web", spec.allowed_tools)
         self.assertIn("run_python_code", spec.allowed_tools)
         self.assertIn("task", spec.disallowed_tools)
 

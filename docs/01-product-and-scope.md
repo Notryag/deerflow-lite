@@ -58,7 +58,7 @@ MVP MUST 只包含以下能力：
 ### 3.4 Tools
 
 - `task`
-- `retrieve_knowledge`
+- `read_file`
 - `search_web`
 - `read_file`
 - `write_file`
@@ -71,7 +71,7 @@ MVP MUST 只包含以下能力：
 - chunk 切分
 - embedding
 - vector store
-- top-k retrieval
+- workspace file inspection
 
 ### 3.6 Outputs
 

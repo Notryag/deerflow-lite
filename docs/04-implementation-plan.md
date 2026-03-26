@@ -25,7 +25,7 @@
 必须完成：
 
 - 保持当前 CLI 可运行
-- 保持现有 workspace / retrieval / 基础测试可用
+- 保持现有 workspace / 基础测试可用
 - 明确旧版固定流水线只是迁移起点
 
 阶段完成条件：
@@ -98,7 +98,7 @@
 
 - 真实 `search_web` provider
 - 受控 shell / python 执行闭环
-- retrieval 与 artifact 引用质量优化
+- artifact 引用质量优化
 
 阶段完成条件：
 
@@ -155,7 +155,7 @@ AI CLI 或自动化实现时，必须遵守以下规则：
 
 - 项目骨架
 - `RunState`、workspace、logger
-- file tools、retrieval pipeline、retrieval tool
+- file tools、web search tool、reporting tool
 - 旧版固定流水线残留
 - 旧版 `run_task` workflow
 - CLI 入口

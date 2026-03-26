@@ -91,7 +91,6 @@ def _build_runtime_state(task: dict[str, Any]) -> tuple[RunState, Workspace]:
     state = RunState(
         thread_id=thread_id,
         user_task=str(task.get("prompt", "")).strip() or str(runtime_context.get("user_task", "")),
-        data_dir=_optional_str(runtime_context.get("data_dir")),
         workspace_dir=str(workspace.thread_dir),
         trace_id=_optional_str(runtime_context.get("trace_id")),
         status="running",
@@ -141,10 +140,6 @@ def _summarize_content(content: Any) -> str:
 
 def _extract_citations(state: RunState) -> list[str]:
     citations: list[str] = []
-    for item in state.retrieved_docs:
-        source = str(item.get("source", "")).strip()
-        if source and source not in citations:
-            citations.append(source)
     for item in state.search_results:
         source = str(item.get("source", "")).strip()
         if source and source not in citations:

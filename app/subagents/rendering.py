@@ -15,7 +15,7 @@ RESEARCH_BASE_PROMPT = (
 
 WRITER_BASE_PROMPT = (
     "Write a concise final markdown report. "
-    "Distinguish facts grounded in retrieved material from synthesis."
+    "Distinguish facts grounded in available evidence from synthesis."
 )
 
 LEAD_BASE_PROMPT = (
@@ -28,7 +28,7 @@ LEAD_BASE_PROMPT = (
 
 FALLBACK_SUBAGENT_BASE_PROMPT = (
     "Work only inside the shared workspace. "
-    "Review the available runtime context, retrieved materials, and web results if present. "
+    "Review the available runtime context, workspace files, and web results if present. "
     "Return a concise summary for the parent agent and write a result artifact."
 )
 
@@ -97,13 +97,12 @@ def build_research_notes_from_state(state: RunState) -> ResearchNotes:
     findings = normalize_bullets(
         [
             f"Task type: {state.task_type or 'research_report'}",
-            "Local retrieval was used." if state.retrieved_docs else "",
             "Web search was used." if state.search_results else "",
             "Delegated subagent output was incorporated." if state.subagent_results else "",
             "The workflow is running with explicit orchestration and file outputs.",
         ]
     )
-    evidence = extract_evidence(state.retrieved_docs) + extract_evidence(state.search_results)
+    evidence = extract_evidence(state.search_results)
     evidence.extend(str(item.get("summary", "")).strip() for item in state.subagent_results if str(item.get("summary", "")).strip())
     open_questions = [] if evidence else ["No external evidence was available; output is based on task and workflow defaults."]
     return ResearchNotes(
@@ -131,11 +130,9 @@ def build_writer_output_from_state(state: RunState, workspace: Workspace | None 
             summary = str(item.get("summary", "")).strip() or str(item.get("status", "unknown"))
             lines.append(f"- `{task_id}`: {summary}")
         sections.append("### Subagent results\n" + "\n".join(lines))
-    evidence = extract_evidence(state.retrieved_docs) + extract_evidence(state.search_results)
+    evidence = extract_evidence(state.search_results)
     evidence.extend(str(artifact) for item in state.subagent_results for artifact in item.get("artifacts", []))
     summary = "Generated a markdown report from the available task context and collected notes."
-    if state.retrieved_docs:
-        summary = "Generated a markdown report using retrieved local context and structured research notes."
     if state.subagent_results:
         summary = "Generated a markdown report from delegated subagent output and collected runtime context."
     return WriterOutput(final_answer=summary, sections=sections, evidence=evidence)

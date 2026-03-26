@@ -49,7 +49,6 @@ class SubagentRegistry:
                 max_turns=50,
                 timeout_seconds=900,
                 allowed_tools=(
-                    "retrieve_knowledge",
                     "search_web",
                     "read_file",
                     "write_file",

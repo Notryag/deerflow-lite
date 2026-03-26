@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import shutil
 from uuid import uuid4
+from pathlib import Path
 
 from app.agents.common import build_context
 from app.agents.lead_agent import LeadAgent
@@ -40,6 +42,8 @@ def run_task(
     state.status = "running"
     logger.info("run started")
     workspace.write_text("input/task.md", user_task)
+    if data_dir:
+        _import_data_dir(workspace, data_dir)
 
     try:
         state = LeadAgent(settings).run(state, workspace)
@@ -80,3 +84,16 @@ def _run_fallback_subagent(state: RunState, workspace: Workspace, settings: Sett
     )
     SubagentExecutor(settings).execute_task(state, workspace, task["task_id"])
     return True
+
+
+def _import_data_dir(workspace: Workspace, data_dir: str) -> None:
+    source_root = Path(data_dir).resolve()
+    if not source_root.exists() or not source_root.is_dir():
+        raise ValueError(f"data_dir does not exist or is not a directory: {data_dir}")
+    for source_path in source_root.rglob("*"):
+        if not source_path.is_file():
+            continue
+        relative = source_path.relative_to(source_root).as_posix()
+        target = workspace.resolve_path(f"workspace/data/{relative}")
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source_path, target)

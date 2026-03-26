@@ -27,7 +27,7 @@
 - `task` 工具参数校验与结果结构
 - `subagent executor` 的超时与并发保护
 - 单层委派限制是否生效
-- retrieval tool 输出结构
+- workspace file tools 输出结构
 
 ## 3. Required Integration Tests
 

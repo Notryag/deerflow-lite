@@ -23,11 +23,11 @@
 - `app/subagents/rendering.py` 已落地第一版共享 helper 层，research / report 产出逻辑服务主流程和 subagent runtime
 - `app/tools/reporting.py` 已承接 fallback workflow 的 notes / final report 产出
 - middleware / tool 边界已经记入主规范：middleware 只管上下文与约束，能力和业务决策必须回到 tool-calling
-- `app/tools/langchain_toolset.py` 已把 retrieval / web / file / python / task 封装成可挂载的 `@tool` 集合，并接到 `lead_agent` 真实模型路径
+- `app/tools/langchain_toolset.py` 已把 web / file / python / task 封装成可挂载的 `@tool` 集合，并接到 `lead_agent` 真实模型路径
 - subagent executor 已开始按 registry 解析 runtime tool bundle，并把实际工具面写进 subagent task/result artifact
 - `app/subagents/runner.py` 已替代脚本式 built-in worker，subagent 现在在子进程里运行真实 `create_agent(..., tools=[...])`
 - CLI MVP 仍可运行
-- 本地 retrieval 已可用
+- `data_dir` 已改为导入到 `workspace/data/`
 - 本地 fake tool-calling agent 路径可用
 - 真实模型路径已打通
 - 测试已覆盖新状态对象、manifest、统一 lead-agent runtime、共享 helper 和复杂任务 delegation 路径
@@ -47,7 +47,6 @@
 | 旧版 CLI 主流程 | completed | 100% | 仍可创建 workspace 和 final output |
 | harness state / workspace | completed | 100% | 已支持 trace、artifact、manifest，并保留旧字段兼容 |
 | lead agent skeleton | completed | 100% | 简单任务可直答，复杂任务可落到 fallback subagent 路径 |
-| 本地 retrieval | completed | 85% | MVP 可用，质量和索引策略仍可加强 |
 | file tools | completed | 90% | 安全校验和测试已具备 |
 | lead agent runtime | in_progress | 88% | lead 与本地 fake model 已统一走 `create_agent(..., tools=[...])`，剩余工作主要是继续清理 legacy 参考实现 |
 | task tool / registry | completed | 100% | registry、task tool、lead-agent wiring 已打通 |
@@ -71,7 +70,7 @@
 
 - `T1`、`T2`、`T3` 已经把状态、lead-agent、task contract 串起来
 - 当前 delegation 主链已经可跑，executor 也已经有基础隔离和 timeout 终止
-- 脚本式 subagent worker 已删除，当前核心缺口变成 legacy 代码收口和真实 provider
+- `rag/retrieval` 已从主链移除，当前核心缺口变成真实 provider 和进一步压缩非主链代码
 - 在 delegation 主链完成前继续补 provider，收益仍然有限
 
 ## 4. Task Breakdown

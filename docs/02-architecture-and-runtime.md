@@ -38,7 +38,6 @@ User Task
 
 这里的“具体能力”包括但不限于：
 
-- retrieval
 - web search
 - file operations
 - shell / python execution
@@ -64,7 +63,6 @@ app/
     task_tool.py
     langchain_toolset.py
     reporting.py
-    retrieval.py
     web_search.py
     file_ops.py
     python_exec.py
@@ -74,12 +72,6 @@ app/
     state.py
     workspace.py
     logger.py
-  rag/
-    loaders.py
-    splitter.py
-    embeddings.py
-    vectorstore.py
-    retriever.py
   config/
     settings.py
   cli/
@@ -181,7 +173,6 @@ subagent 产生的中间 notes、代码、草稿、分析结果 SHOULD 写入 `w
 - task summary
 - available tools summary
 - workspace file summary
-- retrieval summary
 - 已完成 subagent 的摘要结果
 
 允许注入到 subagent 的内容：
@@ -201,7 +192,6 @@ subagent 产生的中间 notes、代码、草稿、分析结果 SHOULD 写入 `w
 
 - 默认只传摘要
 - 长文只传前若干段或压缩摘要
-- retrieval 默认 `top_k = 3`
 - subagent prompt MUST 自包含，不依赖父消息上下文
 - lead agent 优先读取 subagent 摘要和 artifact 路径，而不是全量原文
 
@@ -211,14 +201,13 @@ middleware 适合承载：
 
 - task summary
 - workspace summary
-- retrieval / search 的已有结果摘要
+- search 的已有结果摘要
 - 安全约束
 - trace / logging 元数据
 
 tool 适合承载：
 
 - `task(...)`
-- `retrieve_knowledge(...)`
 - `search_web(...)`
 - `read_file(...)`
 - `write_file(...)`
@@ -244,8 +233,6 @@ tool 适合承载：
 OPENAI_API_KEY=
 OPENAI_BASE_URL=
 MODEL_NAME=
-EMBEDDING_MODEL=
-VECTOR_DB_DIR=.cache/vectorstore
 RUNTIME_DIR=./runtime
 WEB_SEARCH_PROVIDER=stub
 SUBAGENT_MAX_CONCURRENCY=3
@@ -269,7 +256,7 @@ SUBAGENT_TIMEOUT_SECONDS=900
 
 - 主 workflow 已简化为 `lead_agent -> optional task/subagent -> reporting`
 - 复杂任务 fallback 会直接创建 `general-purpose` subagent，再由 tool/helper 产出 notes / report
-- retrieval 使用本地 deterministic embedding 和 JSON vector store 作为 MVP 默认实现
+- `data_dir` 输入会被复制到 `workspace/data/`，由 subagent 通过文件工具直接读取
 - 没有模型配置时，lead agent 与 subagent 会统一落到本地 fake tool-calling model，但对外 contract 不变
 - `subagent runner` 已改为真实 `create_agent(..., tools=[...])` 执行，而不是程序化脚本 worker
 - web search 当前默认是 stub provider

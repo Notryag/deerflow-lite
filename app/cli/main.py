@@ -13,7 +13,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     run_parser = subparsers.add_parser("run", help="Run a DeerFlow Lite task.")
     run_parser.add_argument("task", help="User task to execute.")
-    run_parser.add_argument("--data-dir", dest="data_dir", default=None, help="Path to local data directory.")
+    run_parser.add_argument(
+        "--data-dir",
+        dest="data_dir",
+        default=None,
+        help="Path to local data directory. Files are copied into workspace/data/ before execution.",
+    )
     run_parser.add_argument("--thread-id", dest="thread_id", default=None, help="Optional thread id.")
     run_parser.add_argument("--output", dest="output", default=None, help="Optional output file path.")
     return parser

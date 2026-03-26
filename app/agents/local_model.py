@@ -169,18 +169,6 @@ class LocalToolCallingChatModel(BaseChatModel):
                     }
                 ],
             )
-        if "retrieve_knowledge" in tool_names and self._looks_like_local_research(prompt):
-            return AIMessage(
-                content="",
-                tool_calls=[
-                    {
-                        "name": "retrieve_knowledge",
-                        "args": {"query": query, "top_k": 3},
-                        "id": "call_retrieve_knowledge_1",
-                        "type": "tool_call",
-                    }
-                ],
-            )
         if "search_web" in tool_names and self._looks_like_web_search(prompt):
             return AIMessage(
                 content="",
@@ -208,7 +196,10 @@ class LocalToolCallingChatModel(BaseChatModel):
                 return None
             files = [str(item).strip() for item in parsed if str(item).strip()]
         for file_path in files:
-            if file_path.startswith("logs/"):
+            if file_path.startswith(("workspace/data/", "workspace/")):
+                return file_path
+        for file_path in files:
+            if file_path.startswith(("logs/", "outputs/", "notes/", "subagents/", "input/")):
                 continue
             return file_path
         return None
@@ -256,11 +247,6 @@ class LocalToolCallingChatModel(BaseChatModel):
         if not cleaned:
             return "delegated task"
         return cleaned[:120]
-
-    @staticmethod
-    def _looks_like_local_research(prompt: str) -> bool:
-        lowered = prompt.lower()
-        return any(term in lowered for term in ("retrieve", "local", "docs", "document", "knowledge"))
 
     @staticmethod
     def _looks_like_web_search(prompt: str) -> bool:

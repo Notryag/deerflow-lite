@@ -27,7 +27,7 @@
 2. 当前主 workflow
 3. runtime 核心对象
 4. 当前 agent 实现
-5. tools 与 retrieval
+5. tools
 6. 对应测试
 
 推荐阅读顺序：
@@ -60,6 +60,7 @@
 - 解析 `run` 命令
 - 接收 `task`、`data_dir`、`thread_id`
 - 调用 `run_task`
+- 在传入 `data_dir` 时把文件复制到 `workspace/data/`
 - 输出最终 JSON 摘要
 
 ### Main Workflow
@@ -91,7 +92,7 @@
 职责：
 
 - 从 `.env` 和环境变量加载配置
-- 管理 `model_name`、`base_url`、`runtime_dir`、`vector_db_dir`
+- 管理 `model_name`、`base_url`、`runtime_dir`
 - 管理 `subagent_max_concurrency`、`subagent_timeout_seconds`
 - 控制是否使用本地 fake tool-calling model
 
@@ -186,7 +187,7 @@
 
 职责：
 
-- 把 retrieval / web / file / python / task 能力包装成可挂载的 `@tool`
+- 把 web / file / python / task 能力包装成可挂载的 `@tool`
 - 绑定 `RunState`、`Workspace` 和 `Settings`
 - 为真实模型路径提供统一 tool bundle
 
@@ -263,17 +264,6 @@
 
 - 通过 `Workspace` 暴露 `read_file`、`write_file`、`list_workspace_files`
 
-### Retrieval Tool
-
-文件：
-
-- [app/tools/retrieval.py](D:/workspace/github/deerflow-lite/app/tools/retrieval.py)
-
-职责：
-
-- 暴露 `retrieve_knowledge`
-- 封装 retrieval pipeline 调用
-
 ### Web Search Tool
 
 文件：
@@ -313,44 +303,23 @@
 
 这是 research / final report 产出留在主链中的最小 helper 层。
 
-## 6. Retrieval Stack
-
-文件：
-
-- [app/rag/loaders.py](D:/workspace/github/deerflow-lite/app/rag/loaders.py)
-- [app/rag/splitter.py](D:/workspace/github/deerflow-lite/app/rag/splitter.py)
-- [app/rag/embeddings.py](D:/workspace/github/deerflow-lite/app/rag/embeddings.py)
-- [app/rag/vectorstore.py](D:/workspace/github/deerflow-lite/app/rag/vectorstore.py)
-- [app/rag/retriever.py](D:/workspace/github/deerflow-lite/app/rag/retriever.py)
-
-当前实现方式：
-
-- loader 负责读文件
-- splitter 负责切块
-- embeddings 使用本地 deterministic hash embedding
-- vectorstore 使用本地 JSON 文件
-- retriever 负责索引和检索调度
-
-如果要提升检索质量或索引复用，主要改这一组文件。
-
-## 7. Tests Map
+## 6. Tests Map
 
 测试文件和覆盖点：
 
 - [test_workspace.py](D:/workspace/github/deerflow-lite/tests/test_workspace.py): workspace 创建与路径安全
 - [test_file_ops.py](D:/workspace/github/deerflow-lite/tests/test_file_ops.py): file tools 读写与越界
 - [test_state.py](D:/workspace/github/deerflow-lite/tests/test_state.py): `RunState` 默认值
-- [test_retrieval.py](D:/workspace/github/deerflow-lite/tests/test_retrieval.py): retrieval 输出结构
 - [test_subagent_registry.py](D:/workspace/github/deerflow-lite/tests/test_subagent_registry.py): registry 类型和 `max_turns` 校验
 - [test_task_tool.py](D:/workspace/github/deerflow-lite/tests/test_task_tool.py): task 创建、manifest 写入、参数校验
-- [test_langchain_toolset.py](D:/workspace/github/deerflow-lite/tests/test_langchain_toolset.py): 完整 tool bundle 暴露、检索和搜索 tool 的 state 回填
+- [test_langchain_toolset.py](D:/workspace/github/deerflow-lite/tests/test_langchain_toolset.py): 完整 tool bundle 暴露和搜索 tool 的 state 回填
 - [test_langchain_tool_execution.py](D:/workspace/github/deerflow-lite/tests/test_langchain_tool_execution.py): file/python tool 的实际执行与 artifact 更新
 - [test_subagent_executor.py](D:/workspace/github/deerflow-lite/tests/test_subagent_executor.py): executor 执行、批量执行、timeout、并发上限与 nested delegation 校验
 - [test_reporting_tool.py](D:/workspace/github/deerflow-lite/tests/test_reporting_tool.py): reporting tool 落盘与 state 更新
 - [test_reporting_helpers.py](D:/workspace/github/deerflow-lite/tests/test_reporting_helpers.py): 共享 prompt、markdown renderer 与 subagent artifact contract
 - [test_workflow.py](D:/workspace/github/deerflow-lite/tests/test_workflow.py): 统一 lead-agent runtime、delegation、复杂任务 fallback subagent 主流程
 
-## 8. Hot Files By Task
+## 7. Hot Files By Task
 
 ### 做 `T1. Harness State And Workspace Refactor`
 
@@ -406,7 +375,7 @@
 - [app/tools/reporting.py](D:/workspace/github/deerflow-lite/app/tools/reporting.py)
 - [docs/07-roadmap-and-progress.md](D:/workspace/github/deerflow-lite/docs/07-roadmap-and-progress.md)
 
-## 9. Expected Remaining New Files
+## 8. Expected Remaining New Files
 
 按目标架构，后续大概率还会新增新的 subagent runtime / provider 文件，但共享渲染层已经先落在：
 
@@ -414,7 +383,7 @@
 
 后续新增文件时，应以 `docs/02`、`docs/03` 为准，而不是沿用旧版角色划分。
 
-## 10. Fast Orientation Prompt
+## 9. Fast Orientation Prompt
 
 如果新窗口的 AI 需要快速进入状态，可以给它这个提示：
 
