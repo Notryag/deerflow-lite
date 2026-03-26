@@ -5,6 +5,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from app.agents.common import build_context
 from app.agents.research_agent import ResearchAgent
 from app.agents.writer_agent import WriterAgent
 from app.config.settings import Settings
@@ -14,6 +15,7 @@ from app.subagents.builtins import run_builtin_subagent
 from app.subagents.rendering import (
     ResearchNotes,
     WriterOutput,
+    build_fallback_subagent_prompt,
     build_research_notes_from_state,
     build_writer_output_from_state,
     build_subagent_summary,
@@ -117,6 +119,18 @@ class ReportingHelpersTests(unittest.TestCase):
         self.assertEqual(notes.open_questions, [])
         self.assertIn("docs/02: Lead Agent delegates complex work.", notes.evidence)
 
+    def test_research_builder_includes_subagent_summary(self) -> None:
+        state = RunState(
+            thread_id="thread-reporting",
+            user_task="Summarize the available materials.",
+            subagent_results=[{"task_id": "task_001", "summary": "The subagent inspected the workspace."}],
+        )
+
+        notes = build_research_notes_from_state(state)
+
+        self.assertIn("Delegated subagent output was incorporated.", notes.key_findings)
+        self.assertIn("The subagent inspected the workspace.", notes.evidence)
+
     def test_research_renderer_preserves_section_structure(self) -> None:
         notes = ResearchNotes(
             user_task="Summarize the docs directory.",
@@ -157,6 +171,28 @@ class ReportingHelpersTests(unittest.TestCase):
             )
             self.assertIn("### Task\nWrite the final report.", output.sections)
             self.assertTrue(any("### Notes digest" in section for section in output.sections))
+
+    def test_writer_builder_includes_subagent_results_and_artifacts(self) -> None:
+        state = RunState(
+            thread_id="thread-reporting",
+            user_task="Write the final report.",
+            subagent_results=[
+                {
+                    "task_id": "task_001",
+                    "summary": "The subagent inspected the workspace.",
+                    "artifacts": ["subagents/task_001/result.md"],
+                }
+            ],
+        )
+
+        output = build_writer_output_from_state(state)
+
+        self.assertEqual(
+            output.final_answer,
+            "Generated a markdown report from delegated subagent output and collected runtime context.",
+        )
+        self.assertTrue(any("### Subagent results" in section for section in output.sections))
+        self.assertIn("subagents/task_001/result.md", output.evidence)
 
     def test_writer_renderer_preserves_final_report_structure(self) -> None:
         output = WriterOutput(
@@ -211,6 +247,19 @@ class ReportingHelpersTests(unittest.TestCase):
         self.assertIn("General-purpose reasoning worker", artifact)
         self.assertIn("Prompt", artifact)
         self.assertIn(summary, artifact)
+
+    def test_fallback_subagent_prompt_includes_context_and_user_task(self) -> None:
+        state = RunState(thread_id="thread-reporting", user_task="Summarize the docs directory.")
+        with tempfile.TemporaryDirectory() as tmp:
+            workspace = Workspace(Path(tmp), "thread-reporting").create()
+            prompt = build_fallback_subagent_prompt(
+                state.user_task,
+                context=build_context(state, workspace),
+            )
+
+        self.assertIn("Work only inside the shared workspace.", prompt)
+        self.assertIn("Runtime context:", prompt)
+        self.assertIn("User task:\nSummarize the docs directory.", prompt)
 
 
 if __name__ == "__main__":

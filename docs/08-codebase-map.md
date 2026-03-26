@@ -13,7 +13,7 @@
 当前需要同时记住两件事：
 
 - `docs/01-05` 已经把目标定义成 `Lead Agent + task/subagent`
-- 当前代码已经有了 `lead_agent`、`task tool`、`subagent registry`、最小 `executor`，复杂任务仍会回退到 `orchestrator`，但 research / report 产出已开始走 tool/helper
+- 当前代码已经有了 `lead_agent`、`task tool`、`subagent registry`、最小 `executor`，复杂任务 fallback 会直接创建 `general-purpose` subagent，research / report 产出走 tool/helper
 - `T5` 的迁移重点是把 `research` / `writer` 中的 notes、summary、evidence、markdown 渲染逻辑抽成共享 helper 和 reporting tool，让 legacy agent 和 subagent runtime 复用同一层产出代码
 
 因此，本文件的作用是帮助你定位迁移起点，而不是证明当前实现已经符合目标架构。
@@ -71,7 +71,7 @@
 - 创建 workspace
 - 优先执行 `lead_agent`
 - 在匹配 delegation 时创建 task 并调用最小 `subagent executor`
-- 对复杂任务回退到旧版 orchestrator
+- 对复杂任务走 fallback subagent 路径
 - 根据 state 触发 retrieval 和 web search
 - 调用 reporting tool 写出 `notes/research.md` 和 `outputs/final.md`
 - 写日志并更新 run 状态
@@ -148,7 +148,7 @@
 当前限制：
 
 - stub 路径仍保留较保守的 delegation heuristics 作为 fallback
-- 复杂任务仍会回退旧版 workflow
+- 当 `lead_agent` 未直接完成复杂任务时，workflow 会进入 fallback subagent 路径
 
 ### Shared Agent Helpers
 
@@ -180,7 +180,7 @@
 
 迁移意义：
 
-- 可作为未来 `lead_agent` 的 planning / fallback 参考
+- 可作为未来 `lead_agent` 的 planning 参考
 - 但不能直接等同于目标中的 subagent harness
 
 ### Task Tool
@@ -383,7 +383,7 @@
 - [test_orchestrator.py](D:/workspace/github/deerflow-lite/tests/test_orchestrator.py): 旧版 orchestrator 决策
 - [test_reporting_tool.py](D:/workspace/github/deerflow-lite/tests/test_reporting_tool.py): reporting tool 落盘与 state 更新
 - [test_reporting_helpers.py](D:/workspace/github/deerflow-lite/tests/test_reporting_helpers.py): 共享 prompt、markdown renderer 与 subagent artifact contract
-- [test_workflow.py](D:/workspace/github/deerflow-lite/tests/test_workflow.py): lead-agent 直答、delegation、旧版端到端回退主流程
+- [test_workflow.py](D:/workspace/github/deerflow-lite/tests/test_workflow.py): lead-agent 直答、delegation、复杂任务 fallback subagent 主流程
 
 ## 8. Hot Files By Task
 

@@ -2,15 +2,18 @@ from __future__ import annotations
 
 from uuid import uuid4
 
+from app.agents.common import build_context
 from app.agents.lead_agent import LeadAgent
-from app.agents.orchestrator import OrchestratorAgent
 from app.config.settings import Settings
 from app.runtime.logger import close_run_logger, get_run_logger
 from app.runtime.state import RunState
 from app.runtime.workspace import Workspace
 from app.tools.retrieval import retrieve_knowledge
 from app.tools.reporting import write_final_report, write_research_notes
+from app.tools.task_tool import TaskTool
 from app.tools.web_search import search_web
+from app.subagents.executor import SubagentExecutor
+from app.subagents.rendering import build_fallback_subagent_prompt
 
 
 def init_state(user_task: str, data_dir: str | None, thread_id: str | None = None) -> RunState:
@@ -47,9 +50,8 @@ def run_task(
             logger.info("lead agent completed before legacy workflow")
             return state
 
-        state = OrchestratorAgent(settings).run(state, workspace)
-
-        if state.needs_retrieval and data_dir:
+        if data_dir:
+            state.needs_retrieval = True
             logger.info("running retrieval")
             state.retrieved_docs = retrieve_knowledge(
                 query=user_task,
@@ -59,12 +61,16 @@ def run_task(
                 collection_name=state.thread_id,
             )
 
-        if state.needs_web_search:
+        if _should_run_web_search(user_task):
+            state.needs_web_search = True
             logger.info("running web search")
             state.search_results = search_web(user_task, top_k=3)
 
-        if state.needs_python:
-            logger.info("python execution requested but not enabled in workflow")
+        delegated = _run_fallback_subagent(state, workspace, settings)
+        if delegated:
+            state.task_type = "delegated_response"
+        elif data_dir:
+            state.task_type = "research_report"
 
         write_research_notes(state, workspace)
         write_final_report(state, workspace)
@@ -78,3 +84,23 @@ def run_task(
         raise
     finally:
         close_run_logger(logger)
+
+
+def _should_run_web_search(user_task: str) -> bool:
+    lowered = user_task.lower()
+    tokens = ("web", "search", "latest", "recent", "today", "news", "联网", "搜索")
+    return any(token in lowered for token in tokens)
+
+
+def _run_fallback_subagent(state: RunState, workspace: Workspace, settings: Settings) -> bool:
+    if not state.data_dir and not state.search_results:
+        return False
+
+    context = build_context(state, workspace)
+    task = TaskTool(state, workspace).create_task(
+        description="Investigate task context",
+        prompt=build_fallback_subagent_prompt(state.user_task, context),
+        subagent_type="general-purpose",
+    )
+    SubagentExecutor(settings).execute_task(state, workspace, task["task_id"])
+    return True

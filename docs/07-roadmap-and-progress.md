@@ -20,20 +20,20 @@
 - `subagent executor` 已补上批量并发上限检查和 nested delegation contract 校验
 - `subagent executor` 已补上线程池调度加子进程 worker、timeout 结果回填
 - `app/subagents/builtins.py` 已作为内置 worker 实现落地
-- 当前代码对复杂任务仍保留 `orchestrator` fallback，但 research / report 产出已开始改走 `app/tools/reporting.py`
+- 主 workflow 对复杂任务已经直接创建 `general-purpose` subagent，不再依赖固定 `orchestrator -> research -> writer` 链路
 - `app/subagents/rendering.py` 已落地第一版共享 helper 层，research / report 产出逻辑开始同时服务 legacy agent 和 subagent runtime
 - `app/tools/reporting.py` 已承接 fallback workflow 的 notes / final report 产出
 - CLI MVP 仍可运行
 - 本地 retrieval 已可用
 - stub agent 路径可用
 - 真实模型路径已打通
-- 测试已覆盖新状态对象、manifest、lead agent 直答路径、共享 helper 和旧版 workflow 回退路径
+- 测试已覆盖新状态对象、manifest、lead agent 直答路径、共享 helper 和复杂任务 fallback subagent 路径
 
 当前验证状态：
 
 - `python -m unittest discover -s tests -v` 已通过
-- 当前共有 `32` 个测试通过
-- 新架构已具备 `T1` 到 `T4` 的更完整验证，`T5` 已进入“tool 化 fallback 产出”的第二轮迁移
+- 当前共有 `35` 个测试通过
+- 新架构已具备 `T1` 到 `T4` 的更完整验证，`T5` 已进入“去除固定 legacy agent 主流程依赖”的第二轮迁移
 
 ## 2. Progress By Track
 
@@ -43,13 +43,13 @@
 | 目标架构文档对齐 | completed | 100% | 目标已切换到 subagent harness |
 | 旧版 CLI 主流程 | completed | 100% | 仍可创建 workspace 和 final output |
 | harness state / workspace | completed | 100% | 已支持 trace、artifact、manifest，并保留旧字段兼容 |
-| lead agent skeleton | completed | 100% | 简单任务可直答，复杂任务仍回退旧流程 |
+| lead agent skeleton | completed | 100% | 简单任务可直答，复杂任务可落到 fallback subagent 路径 |
 | 本地 retrieval | completed | 85% | MVP 可用，质量和索引策略仍可加强 |
 | file tools | completed | 90% | 安全校验和测试已具备 |
 | lead agent runtime | in_progress | 60% | 真实模型路径已切到 tool-calling delegation，stub 路径仍有 fallback heuristics |
 | task tool / registry | completed | 100% | registry、task tool、lead-agent wiring 已打通 |
 | subagent executor | in_progress | 85% | 已有线程池调度、子进程 worker、timeout 终止、并发上限检查、nested delegation 校验 |
-| legacy logic migration | in_progress | 75% | `rendering.py` 与 `reporting.py` 已接住共享 helper 和 fallback 产出，主缺口变成移除固定 legacy agent 依赖 |
+| legacy logic migration | in_progress | 85% | 主 workflow 已摆脱固定 `research/writer` 依赖，主缺口变成移除 `orchestrator` 的残留参考地位 |
 | web search | pending | 20% | 当前仍为 stub |
 | python exec | pending | 15% | 已有基础函数，未纳入新架构 |
 | 运行健壮性 | pending | 20% | 新架构的 timeout、manifest、失败恢复尚未实现 |
@@ -59,7 +59,7 @@
 
 建议按以下顺序继续：
 
-1. 从 workflow 中彻底移除固定 legacy agent 依赖，让复杂任务直接落到 `general-purpose` / `bash` subagent
+1. 清理 `orchestrator.py` 的残留参考角色，把复杂任务 planning 彻底并入 lead-agent / tool 路径
 2. 再做真实 `search_web` provider 和受控执行能力
 3. 为 subagent 增加更真实的 worker 能力和工具接入
 4. 最后再考虑 API
@@ -127,7 +127,7 @@ Status: `completed`
 - 已新增 `lead_agent.py`
 - 真实模型路径下，是否委派由 `lead_agent` 通过 `task` tool-calling 决定
 - 简单任务在 stub 路径下仍可直接完成并写出 `outputs/final.md`
-- 复杂任务暂时继续回退到旧版 `orchestrator -> research -> writer` 流程
+- 当 `lead_agent` 未直接完成复杂任务时，workflow 会进入 fallback subagent 路径
 
 ### T3. Task Tool And Registry
 
@@ -222,7 +222,8 @@ Status: `in_progress`
 - `research_agent` 与 `writer_agent` 已改为复用共享 helper
 - `builtins.py` 已改为复用共享 subagent summary / artifact 渲染逻辑
 - `run_task` 的 fallback research / final report 产出已改走 `reporting.py`
-- 共享层目前已覆盖数据形状、summary、markdown 渲染和 prompt 模板；主缺口是彻底移除固定 legacy agent 角色
+- `run_task` 的复杂任务 fallback 已直接创建 `general-purpose` subagent
+- 共享层目前已覆盖数据形状、summary、markdown 渲染和 prompt 模板；主缺口是清理 `orchestrator.py` 的残留参考角色
 
 ### T6. Real Web Search And Controlled Execution
 
@@ -268,7 +269,7 @@ Status: `deferred`
 理由：
 
 - delegation 主链已经打通，executor 也已经具备基础可控性
-- prompt 模板和 fallback 产出已经开始 tool 化，下一步最有价值的是直接去掉固定 legacy agent 依赖
+- prompt 模板和 fallback 产出已经开始 tool 化，下一步最有价值的是清理 `orchestrator.py` 的残留参考角色
 - 这样后续接真实 tool/provider 时，workflow 和 subagent runtime 都能沿用同一套输出 contract
 - 先统一产出层，再扩工具层，能减少后续重构次数
 

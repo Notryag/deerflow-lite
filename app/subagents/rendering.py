@@ -26,6 +26,12 @@ LEAD_BASE_PROMPT = (
     "After any tool use, produce a concise final answer."
 )
 
+FALLBACK_SUBAGENT_BASE_PROMPT = (
+    "Work only inside the shared workspace. "
+    "Review the available runtime context, retrieved materials, and web results if present. "
+    "Return a concise summary for the parent agent and write a result artifact."
+)
+
 
 class ResearchNotes(BaseModel):
     user_task: str
@@ -80,16 +86,25 @@ def build_lead_prompt(context: AgentContext) -> str:
     return build_prompt_with_context(LEAD_BASE_PROMPT, context)
 
 
+def build_fallback_subagent_prompt(user_task: str, context: AgentContext) -> str:
+    return (
+        f"{build_prompt_with_context(FALLBACK_SUBAGENT_BASE_PROMPT, context)}\n\n"
+        f"User task:\n{user_task}"
+    )
+
+
 def build_research_notes_from_state(state: RunState) -> ResearchNotes:
     findings = normalize_bullets(
         [
             f"Task type: {state.task_type or 'research_report'}",
             "Local retrieval was used." if state.retrieved_docs else "",
             "Web search was used." if state.search_results else "",
+            "Delegated subagent output was incorporated." if state.subagent_results else "",
             "The workflow is running with explicit orchestration and file outputs.",
         ]
     )
     evidence = extract_evidence(state.retrieved_docs) + extract_evidence(state.search_results)
+    evidence.extend(str(item.get("summary", "")).strip() for item in state.subagent_results if str(item.get("summary", "")).strip())
     open_questions = [] if evidence else ["No external evidence was available; output is based on task and workflow defaults."]
     return ResearchNotes(
         user_task=state.user_task,
@@ -104,15 +119,25 @@ def build_writer_output_from_state(state: RunState, workspace: Workspace | None 
     if workspace is not None and state.notes_files:
         notes_excerpt = workspace.read_text(state.notes_files[0])[:500].strip()
     sections = [
-        "### Workflow\nThis run used an explicit orchestrator, file-backed workspace, and structured state transitions.",
+        "### Workflow\nThis run used an explicit workflow, file-backed workspace, and structured state transitions.",
         f"### Task\n{state.user_task}",
     ]
     if notes_excerpt:
         sections.append(f"### Notes digest\n{notes_excerpt}")
+    if state.subagent_results:
+        lines = []
+        for item in state.subagent_results:
+            task_id = str(item.get("task_id", "unknown"))
+            summary = str(item.get("summary", "")).strip() or str(item.get("status", "unknown"))
+            lines.append(f"- `{task_id}`: {summary}")
+        sections.append("### Subagent results\n" + "\n".join(lines))
     evidence = extract_evidence(state.retrieved_docs) + extract_evidence(state.search_results)
+    evidence.extend(str(artifact) for item in state.subagent_results for artifact in item.get("artifacts", []))
     summary = "Generated a markdown report from the available task context and collected notes."
     if state.retrieved_docs:
         summary = "Generated a markdown report using retrieved local context and structured research notes."
+    if state.subagent_results:
+        summary = "Generated a markdown report from delegated subagent output and collected runtime context."
     return WriterOutput(final_answer=summary, sections=sections, evidence=evidence)
 
 

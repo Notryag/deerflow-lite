@@ -231,8 +231,9 @@ SUBAGENT_TIMEOUT_SECONDS=900
 
 当前参考实现仍保留以下旧版工程取舍：
 
-- 代码里仍保留 `orchestrator` 作为复杂任务 fallback 的 planning 节点
-- 复杂任务的 research / report 产出已经开始改走 tool/helper，而不是固定 `research -> writer` agent 节点
+- 主 workflow 已不再依赖固定 `orchestrator -> research -> writer` 链路
+- 复杂任务 fallback 会直接创建 `general-purpose` subagent，再由 tool/helper 产出 notes / report
+- `orchestrator.py` 仍保留在仓库中作为 legacy planning 参考实现
 - retrieval 使用本地 deterministic embedding 和 JSON vector store 作为 MVP 默认实现
 - 没有模型配置时，agent 允许走 stub 路径，但对外 contract 不变
 - stub 路径允许使用少量 deterministic heuristics 作为 fallback，但这不是目标中的委派决策机制
