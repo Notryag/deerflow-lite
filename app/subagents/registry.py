@@ -46,7 +46,7 @@ class SubagentRegistry:
             SubagentSpec(
                 name="general-purpose",
                 description="General research and synthesis worker.",
-                max_turns=8,
+                max_turns=50,
                 timeout_seconds=900,
                 allowed_tools=(
                     "retrieve_knowledge",
@@ -54,12 +54,13 @@ class SubagentRegistry:
                     "read_file",
                     "write_file",
                     "list_workspace_files",
+                    "run_python_code",
                 ),
             ),
             SubagentSpec(
                 name="bash",
                 description="Shell-oriented worker with a narrower tool surface.",
-                max_turns=6,
+                max_turns=30,
                 timeout_seconds=900,
                 allowed_tools=(
                     "read_file",

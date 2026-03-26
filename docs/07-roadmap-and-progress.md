@@ -25,6 +25,7 @@
 - `app/tools/reporting.py` 已承接 fallback workflow 的 notes / final report 产出
 - middleware / tool 边界已经记入主规范：middleware 只管上下文与约束，能力和业务决策必须回到 tool-calling
 - `app/tools/langchain_toolset.py` 已把 retrieval / web / file / python / task 封装成可挂载的 `@tool` 集合，并接到 `lead_agent` 真实模型路径
+- subagent executor 已开始按 registry 解析 runtime tool bundle，并把实际工具面写进 subagent task/result artifact
 - CLI MVP 仍可运行
 - 本地 retrieval 已可用
 - stub agent 路径可用
@@ -34,7 +35,7 @@
 当前验证状态：
 
 - `python -m unittest discover -s tests -v` 已通过
-- 当前共有 `38` 个测试通过
+- 当前共有 `39` 个测试通过
 - 新架构已具备 `T1` 到 `T4` 的更完整验证，`T5` 已进入“去除固定 legacy agent 主流程依赖”的第二轮迁移
 
 ## 2. Progress By Track
@@ -50,7 +51,7 @@
 | file tools | completed | 90% | 安全校验和测试已具备 |
 | lead agent runtime | in_progress | 75% | 真实模型路径已切到完整 tool bundle，workflow 侧 web-search heuristics 已移除，stub 路径仅保留极小直答能力 |
 | task tool / registry | completed | 100% | registry、task tool、lead-agent wiring 已打通 |
-| subagent executor | in_progress | 85% | 已有线程池调度、子进程 worker、timeout 终止、并发上限检查、nested delegation 校验 |
+| subagent executor | in_progress | 88% | 已有线程池调度、子进程 worker、timeout 终止、并发上限检查、nested delegation 校验，并开始解析 runtime tool bundle |
 | legacy logic migration | in_progress | 85% | 主 workflow 已摆脱固定 `research/writer` 依赖，主缺口变成移除 `orchestrator` 的残留参考地位 |
 | web search | pending | 20% | 当前仍为 stub |
 | python exec | pending | 15% | 已有基础函数，未纳入新架构 |
@@ -221,11 +222,13 @@ Status: `in_progress`
 
 - 已新增 `app/subagents/rendering.py`
 - 已新增 `app/tools/reporting.py`
+- `general-purpose` 默认上限已提升到 `50` turns，`bash` 提升到 `30` turns
 - `research_agent` 与 `writer_agent` 已改为复用共享 helper
 - `builtins.py` 已改为复用共享 subagent summary / artifact 渲染逻辑
 - `run_task` 的 fallback research / final report 产出已改走 `reporting.py`
 - `run_task` 的复杂任务 fallback 已直接创建 `general-purpose` subagent
-- 共享层目前已覆盖数据形状、summary、markdown 渲染和 prompt 模板；主缺口是清理 `orchestrator.py` 的残留参考角色
+- executor 已会按 registry 过滤 subagent runtime tools，并把工具面写入 result artifact
+- 共享层目前已覆盖数据形状、summary、markdown 渲染和 prompt 模板；主缺口是让 subagent worker 真正执行这些工具而不是只记录工具面
 
 ### T6. Real Web Search And Controlled Execution
 

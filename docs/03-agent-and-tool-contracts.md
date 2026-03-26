@@ -191,9 +191,16 @@ registry MUST 提供稳定的类型到配置映射。
 {
   "name": "general-purpose",
   "description": "General research and synthesis worker.",
-  "max_turns": 8,
+  "max_turns": 50,
   "timeout_seconds": 900,
-  "allowed_tools": ["retrieve_knowledge", "search_web", "read_file", "write_file", "list_workspace_files"],
+  "allowed_tools": [
+    "retrieve_knowledge",
+    "search_web",
+    "read_file",
+    "write_file",
+    "list_workspace_files",
+    "run_python_code",
+  ],
   "disallowed_tools": ["task"],
 }
 ```
@@ -204,6 +211,8 @@ registry MUST 提供稳定的类型到配置映射。
 - 每种类型 MUST 有显式 `max_turns`
 - 每种类型 MUST 有显式 `timeout_seconds`
 - `task` MUST 默认在所有 subagent 类型中禁用
+- `general-purpose` SHOULD 暴露除 delegation 外的主要分析与执行工具
+- `bash` SHOULD 暴露更窄的受控执行工具面
 
 ## 7. Subagent Executor Contract
 
@@ -224,6 +233,7 @@ executor MUST 负责 subagent 生命周期管理。
 - 超时后 MUST 返回 `status="failed"` 或 `status="timeout"`
 - executor MUST 将结果写回 `RunState.subagent_results`
 - executor SHOULD 将每个 subagent 的日志或 manifest 写入 workspace
+- executor SHOULD 按 registry 解析 subagent 的实际 runtime tool bundle
 
 ## 8. Retrieval Tool Contract
 

@@ -10,6 +10,7 @@ from app.runtime.state import RunState
 from app.runtime.workspace import Workspace
 from app.subagents.builtins import read_worker_message, run_subagent_worker
 from app.subagents.registry import SubagentRegistry
+from app.tools.langchain_toolset import build_langchain_tools
 
 
 class SubagentExecutor:
@@ -24,7 +25,7 @@ class SubagentExecutor:
                 f"({len(task_ids)} > {self.settings.subagent_max_concurrency})"
             )
 
-        prepared = [self._prepare_task(state, task_id) for task_id in task_ids]
+        prepared = [self._prepare_task(state, workspace, task_id) for task_id in task_ids]
         results: list[dict[str, Any]] = []
         max_workers = max(1, min(len(prepared), self.settings.subagent_max_concurrency))
 
@@ -60,17 +61,28 @@ class SubagentExecutor:
     def execute_task(self, state: RunState, workspace: Workspace, task_id: str) -> dict[str, Any]:
         return self.execute_tasks(state, workspace, [task_id])[0]
 
-    def _prepare_task(self, state: RunState, task_id: str) -> dict[str, Any]:
+    def _prepare_task(self, state: RunState, workspace: Workspace, task_id: str) -> dict[str, Any]:
         task = self._find_task(state, task_id)
         spec = self.registry.get(str(task["subagent_type"]))
         self._validate_task(task, spec.name)
+        runtime_tools = [
+            tool.name
+            for tool in build_langchain_tools(
+                state,
+                workspace,
+                self.settings,
+                include_task=False,
+                allowed_tool_names=spec.allowed_tools,
+            )
+        ]
         effective_timeout = min(
             float(task.get("timeout_seconds", spec.timeout_seconds)),
             float(self.settings.subagent_timeout_seconds),
         )
         if effective_timeout <= 0:
             raise ValueError("configured timeout must be greater than 0")
-        return {"task": task, "spec": spec, "effective_timeout": effective_timeout}
+        enriched_task = {**task, "runtime_tools": runtime_tools}
+        return {"task": enriched_task, "spec": spec, "effective_timeout": effective_timeout}
 
     @staticmethod
     def _find_task(state: RunState, task_id: str) -> dict[str, Any]:

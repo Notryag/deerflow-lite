@@ -8,7 +8,6 @@ from langchain_core.tools import tool
 from app.config.settings import Settings
 from app.runtime.state import RunState
 from app.runtime.workspace import Workspace
-from app.subagents.executor import SubagentExecutor
 from app.tools.file_ops import FileOpsToolset
 from app.tools.python_exec import run_python_code
 from app.tools.retrieval import retrieve_knowledge
@@ -22,10 +21,10 @@ def build_langchain_tools(
     settings: Settings,
     *,
     include_task: bool,
+    allowed_tool_names: tuple[str, ...] | None = None,
 ) -> list[object]:
     file_ops = FileOpsToolset(workspace)
     task_tool_impl = TaskTool(state, workspace)
-    executor = SubagentExecutor(settings)
 
     @tool("retrieve_knowledge", parse_docstring=True)
     def retrieve_knowledge_tool(query: str, top_k: int = 3) -> str:
@@ -116,6 +115,9 @@ def build_langchain_tools(
     ]
 
     if include_task:
+        from app.subagents.executor import SubagentExecutor
+
+        executor = SubagentExecutor(settings)
 
         @tool("task", parse_docstring=True)
         def delegate_task(
@@ -162,4 +164,8 @@ def build_langchain_tools(
 
         tools.append(delegate_task)
 
-    return tools
+    if allowed_tool_names is None:
+        return tools
+
+    allowed = set(allowed_tool_names)
+    return [item for item in tools if getattr(item, "name", "") in allowed]

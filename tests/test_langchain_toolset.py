@@ -45,6 +45,24 @@ class LangchainToolsetTests(unittest.TestCase):
             self.assertEqual(state.search_results, results)
             self.assertEqual(len(results), 2)
 
+    def test_build_langchain_tools_filters_by_allowed_tool_names(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            workspace = Workspace(Path(tmp), "thread-tools").create()
+            state = RunState(thread_id="thread-tools", user_task="Inspect the workspace.")
+
+            tools = build_langchain_tools(
+                state,
+                workspace,
+                Settings(),
+                include_task=False,
+                allowed_tool_names=("read_file", "write_file", "list_workspace_files", "run_python_code"),
+            )
+
+            self.assertEqual(
+                {tool.name for tool in tools},
+                {"read_file", "write_file", "list_workspace_files", "run_python_code"},
+            )
+
     def test_retrieve_knowledge_tool_updates_state_from_data_dir(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

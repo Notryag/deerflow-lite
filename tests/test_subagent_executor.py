@@ -27,8 +27,12 @@ class SubagentExecutorTests(unittest.TestCase):
             self.assertEqual(result["status"], "completed")
             self.assertEqual(state.subagent_tasks[0]["status"], "completed")
             self.assertEqual(state.subagent_results[0]["task_id"], task["task_id"])
+            self.assertIn("runtime_tools", state.subagent_tasks[0])
+            self.assertIn("read_file", state.subagent_tasks[0]["runtime_tools"])
             self.assertIn("subagents/task_001/result.md", state.artifact_files)
             self.assertTrue((workspace.thread_dir / "subagents" / "task_001" / "result.md").exists())
+            body = (workspace.thread_dir / "subagents" / "task_001" / "result.md").read_text(encoding="utf-8")
+            self.assertIn("## Runtime Tools", body)
 
     def test_execute_tasks_rejects_batch_larger_than_configured_concurrency(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

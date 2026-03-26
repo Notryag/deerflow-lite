@@ -233,12 +233,13 @@
 - 生成 `subagents/{task_id}/result.md`
 - 将结果回填到 `RunState.subagent_results` 和 manifest
 - 在 timeout 时返回结构化 `timeout` 结果
+- 按 registry 解析 subagent runtime tool bundle
 
 当前限制：
 
 - 当前并发层是“线程池调度 + 子进程 worker”
 - 已有并发上限检查和 nested delegation 校验
-- 当前只有内置 worker，尚未接入更真实的 subagent 工具运行时
+- 当前只有内置 worker，尚未让 worker 真正执行这些工具
 
 ### Built-In Workers
 
@@ -251,6 +252,7 @@
 - 复用共享渲染 helper 生成内置 worker 的摘要和 artifact
 - 作为子进程 worker 的入口函数
 - 支持测试用的可控延时
+- 在 artifact 中记录当前 subagent 的 runtime tools
 
 ### Shared Rendering Helpers
 
