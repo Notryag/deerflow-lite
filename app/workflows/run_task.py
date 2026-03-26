@@ -11,7 +11,6 @@ from app.runtime.workspace import Workspace
 from app.tools.retrieval import retrieve_knowledge
 from app.tools.reporting import write_final_report, write_research_notes
 from app.tools.task_tool import TaskTool
-from app.tools.web_search import search_web
 from app.subagents.executor import SubagentExecutor
 from app.subagents.rendering import build_fallback_subagent_prompt
 
@@ -61,11 +60,6 @@ def run_task(
                 collection_name=state.thread_id,
             )
 
-        if _should_run_web_search(user_task):
-            state.needs_web_search = True
-            logger.info("running web search")
-            state.search_results = search_web(user_task, top_k=3)
-
         delegated = _run_fallback_subagent(state, workspace, settings)
         if delegated:
             state.task_type = "delegated_response"
@@ -84,13 +78,6 @@ def run_task(
         raise
     finally:
         close_run_logger(logger)
-
-
-def _should_run_web_search(user_task: str) -> bool:
-    lowered = user_task.lower()
-    tokens = ("web", "search", "latest", "recent", "today", "news", "联网", "搜索")
-    return any(token in lowered for token in tokens)
-
 
 def _run_fallback_subagent(state: RunState, workspace: Workspace, settings: Settings) -> bool:
     if not state.data_dir and not state.search_results:

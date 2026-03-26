@@ -23,6 +23,7 @@
 - 主 workflow 对复杂任务已经直接创建 `general-purpose` subagent，不再依赖固定 `orchestrator -> research -> writer` 链路
 - `app/subagents/rendering.py` 已落地第一版共享 helper 层，research / report 产出逻辑开始同时服务 legacy agent 和 subagent runtime
 - `app/tools/reporting.py` 已承接 fallback workflow 的 notes / final report 产出
+- middleware / tool 边界已经记入主规范：middleware 只管上下文与约束，能力和业务决策必须回到 tool-calling
 - CLI MVP 仍可运行
 - 本地 retrieval 已可用
 - stub agent 路径可用
@@ -46,7 +47,7 @@
 | lead agent skeleton | completed | 100% | 简单任务可直答，复杂任务可落到 fallback subagent 路径 |
 | 本地 retrieval | completed | 85% | MVP 可用，质量和索引策略仍可加强 |
 | file tools | completed | 90% | 安全校验和测试已具备 |
-| lead agent runtime | in_progress | 60% | 真实模型路径已切到 tool-calling delegation，stub 路径仍有 fallback heuristics |
+| lead agent runtime | in_progress | 65% | 真实模型路径已切到 tool-calling delegation，workflow 侧 web-search heuristics 已移除，stub 路径仍有 fallback heuristics |
 | task tool / registry | completed | 100% | registry、task tool、lead-agent wiring 已打通 |
 | subagent executor | in_progress | 85% | 已有线程池调度、子进程 worker、timeout 终止、并发上限检查、nested delegation 校验 |
 | legacy logic migration | in_progress | 85% | 主 workflow 已摆脱固定 `research/writer` 依赖，主缺口变成移除 `orchestrator` 的残留参考地位 |
@@ -59,7 +60,7 @@
 
 建议按以下顺序继续：
 
-1. 清理 `orchestrator.py` 的残留参考角色，把复杂任务 planning 彻底并入 lead-agent / tool 路径
+1. 继续清理程序侧 heuristics，把检索、搜索等决策彻底并入 lead-agent / subagent 的 tool-calling 路径
 2. 再做真实 `search_web` provider 和受控执行能力
 3. 为 subagent 增加更真实的 worker 能力和工具接入
 4. 最后再考虑 API
@@ -269,7 +270,7 @@ Status: `deferred`
 理由：
 
 - delegation 主链已经打通，executor 也已经具备基础可控性
-- prompt 模板和 fallback 产出已经开始 tool 化，下一步最有价值的是清理 `orchestrator.py` 的残留参考角色
+- prompt 模板和 fallback 产出已经开始 tool 化，下一步最有价值的是继续清理程序侧 heuristics
 - 这样后续接真实 tool/provider 时，workflow 和 subagent runtime 都能沿用同一套输出 contract
 - 先统一产出层，再扩工具层，能减少后续重构次数
 

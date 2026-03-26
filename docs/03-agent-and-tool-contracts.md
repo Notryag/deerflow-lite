@@ -16,6 +16,7 @@
 - 输出能直接写入 `RunState`
 - 不依赖自然语言猜测隐含字段
 - 除 delegation 外，具体能力 SHOULD 优先以下沉到 tool / helper 层的方式暴露，而不是固化成固定 agent 角色
+- middleware MUST 只负责上下文注入与系统约束，MUST NOT 承担业务决策
 
 ## 2. RunState
 
@@ -123,6 +124,23 @@ class RunState(BaseModel):
 - `task` MUST 记录 `task_id`
 - `task` MUST NOT 允许 subagent 再创建 subagent
 - 失败时也 MUST 返回结构化结果或将错误写入 `state.errors`
+
+## 4.5 Middleware Boundary
+
+middleware 的职责仅限于：
+
+- 注入 task / workspace / retrieval / subagent 摘要
+- 注入安全约束和系统级提示
+- 承载 trace / logging 所需元数据
+
+middleware MUST NOT：
+
+- 决定是否调用 `search_web`
+- 决定是否调用 `retrieve_knowledge`
+- 决定是否读写文件
+- 决定是否委派 subagent
+
+这些决定 SHOULD 由模型在看到 tool 描述后自主完成。
 
 ## 5. Subagent Contract
 

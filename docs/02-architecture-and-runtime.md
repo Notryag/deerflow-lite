@@ -162,6 +162,17 @@ subagent 产生的中间 notes、代码、草稿、分析结果 SHOULD 写入 `w
 
 真实模型路径中，是否委派给 subagent SHOULD 由 lead agent 在 tool-calling 过程中决定，而不是由 Python 侧 heuristics 预先硬编码。
 
+这里必须明确区分两层系统：
+
+- `middleware` 负责注入上下文、系统约束、运行时摘要和观测信息
+- `tool` 负责暴露具体能力，例如搜索、检索、文件操作、命令执行和委派
+
+因此：
+
+- middleware MUST NOT 替模型决定是否搜索、是否检索、是否读写文件、是否委派
+- workflow SHOULD NOT 用业务 heuristics 预判这些动作
+- 这些动作 SHOULD 由模型在 tool-calling 过程中自主决定
+
 允许注入到 lead agent 的内容：
 
 - task summary
@@ -191,7 +202,29 @@ subagent 产生的中间 notes、代码、草稿、分析结果 SHOULD 写入 `w
 - subagent prompt MUST 自包含，不依赖父消息上下文
 - lead agent 优先读取 subagent 摘要和 artifact 路径，而不是全量原文
 
-### 5.2 Delegation Guardrails
+### 5.2 Middleware And Tool Boundary
+
+middleware 适合承载：
+
+- task summary
+- workspace summary
+- retrieval / search 的已有结果摘要
+- 安全约束
+- trace / logging 元数据
+
+tool 适合承载：
+
+- `task(...)`
+- `retrieve_knowledge(...)`
+- `search_web(...)`
+- `read_file(...)`
+- `write_file(...)`
+- `run_python_code(...)` 或 shell 工具
+- research / report 产出 helper 或 tool
+
+任何“是否执行某个能力”的判断，都 SHOULD 发生在模型调用 tool 时，而不是在 middleware 或 workflow 的 `if/else` 里。
+
+### 5.3 Delegation Guardrails
 
 - subagent MUST NOT 再创建 subagent
 - 默认最大并发数 SHOULD 为 `3`
