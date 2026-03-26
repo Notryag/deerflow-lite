@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from typing import Literal
 
 from langchain_core.tools import tool
@@ -82,7 +83,7 @@ def build_langchain_tools(
         """
 
         written = file_ops.write_file(path, content)
-        relative = str(workspace.relative_path(written)).replace("\\", "/")
+        relative = str(Path(written).resolve().relative_to(workspace.thread_dir)).replace("\\", "/")
         state.add_artifact_file(relative)
         return relative
 

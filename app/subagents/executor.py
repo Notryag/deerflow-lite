@@ -75,13 +75,21 @@ class SubagentExecutor:
                 allowed_tool_names=spec.allowed_tools,
             )
         ]
+        runtime_context = {
+            "thread_id": state.thread_id,
+            "runtime_dir": str(workspace.runtime_dir),
+            "workspace_dir": str(workspace.thread_dir),
+            "data_dir": state.data_dir,
+            "vector_db_dir": str(self.settings.vector_db_dir),
+            "user_task": state.user_task,
+        }
         effective_timeout = min(
             float(task.get("timeout_seconds", spec.timeout_seconds)),
             float(self.settings.subagent_timeout_seconds),
         )
         if effective_timeout <= 0:
             raise ValueError("configured timeout must be greater than 0")
-        enriched_task = {**task, "runtime_tools": runtime_tools}
+        enriched_task = {**task, "runtime_tools": runtime_tools, "runtime_context": runtime_context}
         return {"task": enriched_task, "spec": spec, "effective_timeout": effective_timeout}
 
     @staticmethod

@@ -151,7 +151,14 @@ def build_subagent_summary(task: dict[str, Any], spec_name: str) -> str:
     tool_suffix = ""
     if tool_names:
         tool_suffix = f" Available tools: {', '.join(tool_names)}."
-    return f"{spec_name} worker completed delegated task '{description}'. Prompt focus: {prompt_excerpt}.{tool_suffix}"
+    executed = [str(item) for item in task.get("executed_tools", []) if str(item).strip()]
+    executed_suffix = ""
+    if executed:
+        executed_suffix = f" Executed tools: {', '.join(executed)}."
+    return (
+        f"{spec_name} worker completed delegated task '{description}'. "
+        f"Prompt focus: {prompt_excerpt}.{tool_suffix}{executed_suffix}"
+    )
 
 
 def build_delegated_final_answer() -> str:
@@ -178,6 +185,10 @@ def render_subagent_result_markdown(
     summary: str,
 ) -> str:
     tool_lines = ", ".join(str(item) for item in task.get("runtime_tools", []) if str(item).strip()) or "none"
+    execution_lines = (
+        "\n".join(f"- {item}" for item in task.get("tool_observations", []) if str(item).strip())
+        or "- none"
+    )
     return (
         "# Subagent Result\n\n"
         f"## Task ID\n{task['task_id']}\n\n"
@@ -185,6 +196,7 @@ def render_subagent_result_markdown(
         f"## Subagent Type\n{task['subagent_type']}\n\n"
         f"## Type Notes\n{spec_description}\n\n"
         f"## Runtime Tools\n{tool_lines}\n\n"
+        f"## Tool Execution\n{execution_lines}\n\n"
         f"## Worker\n{spec_name}\n\n"
         f"## Prompt\n{task['prompt']}\n\n"
         f"## Summary\n{summary}\n"

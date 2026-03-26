@@ -239,7 +239,7 @@
 
 - 当前并发层是“线程池调度 + 子进程 worker”
 - 已有并发上限检查和 nested delegation 校验
-- 当前只有内置 worker，尚未让 worker 真正执行这些工具
+- 当前是“最小真实工具执行”，还不是完整模型驱动 tool-calling worker
 
 ### Built-In Workers
 
@@ -253,6 +253,7 @@
 - 作为子进程 worker 的入口函数
 - 支持测试用的可控延时
 - 在 artifact 中记录当前 subagent 的 runtime tools
+- 最小真实执行 `list_workspace_files`、`search_web`、`retrieve_knowledge`、显式 `read_file` / `write_file` / `run_python_code`
 
 ### Shared Rendering Helpers
 
@@ -395,6 +396,7 @@
 - [test_subagent_registry.py](D:/workspace/github/deerflow-lite/tests/test_subagent_registry.py): registry 类型和 `max_turns` 校验
 - [test_task_tool.py](D:/workspace/github/deerflow-lite/tests/test_task_tool.py): task 创建、manifest 写入、参数校验
 - [test_langchain_toolset.py](D:/workspace/github/deerflow-lite/tests/test_langchain_toolset.py): 完整 tool bundle 暴露、检索和搜索 tool 的 state 回填
+- [test_langchain_tool_execution.py](D:/workspace/github/deerflow-lite/tests/test_langchain_tool_execution.py): file/python tool 的实际执行与 artifact 更新
 - [test_subagent_executor.py](D:/workspace/github/deerflow-lite/tests/test_subagent_executor.py): executor 执行、批量执行、timeout、并发上限与 nested delegation 校验
 - [test_orchestrator.py](D:/workspace/github/deerflow-lite/tests/test_orchestrator.py): 旧版 orchestrator 决策
 - [test_reporting_tool.py](D:/workspace/github/deerflow-lite/tests/test_reporting_tool.py): reporting tool 落盘与 state 更新
