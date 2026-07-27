@@ -94,6 +94,24 @@ def test_normalizes_provider_usage_aliases_and_derives_total() -> None:
     }
 
 
+def test_normalizes_cached_input_token_details_without_inventing_zero() -> None:
+    cached = normalize_token_usage(
+        {
+            "input_tokens": 100,
+            "output_tokens": 5,
+            "input_token_details": {"cache_read": 80},
+        }
+    )
+    omitted = normalize_token_usage({"input_tokens": 100, "output_tokens": 5})
+
+    assert cached is not None
+    assert cached.cached_input_tokens == 80
+    assert cached.as_dict()["cached_input_tokens"] == 80
+    assert omitted is not None
+    assert omitted.cached_input_tokens is None
+    assert "cached_input_tokens" not in omitted.as_dict()
+
+
 def test_runtime_usage_accumulator_sums_each_model_call_once() -> None:
     asyncio.run(_assert_runtime_usage_accumulator())
 

@@ -25,13 +25,17 @@ class TokenUsage:
     input_tokens: int
     output_tokens: int
     total_tokens: int
+    cached_input_tokens: int | None = None
 
     def as_dict(self) -> dict[str, int]:
-        return {
+        result = {
             "input_tokens": self.input_tokens,
             "output_tokens": self.output_tokens,
             "total_tokens": self.total_tokens,
         }
+        if self.cached_input_tokens is not None:
+            result["cached_input_tokens"] = self.cached_input_tokens
+        return result
 
 
 class RuntimeUsageAccumulator:
@@ -64,6 +68,11 @@ class RuntimeUsageAccumulator:
             input_tokens=sum(usage.input_tokens for usage in self._calls.values()),
             output_tokens=sum(usage.output_tokens for usage in self._calls.values()),
             total_tokens=sum(usage.total_tokens for usage in self._calls.values()),
+            cached_input_tokens=(
+                sum(usage.cached_input_tokens for usage in self._calls.values())
+                if all(usage.cached_input_tokens is not None for usage in self._calls.values())
+                else None
+            ),
         )
 
 
@@ -290,6 +299,7 @@ def normalize_token_usage(*candidates: Any) -> TokenUsage | None:
                     if total_tokens is not None
                     else resolved_input + resolved_output
                 ),
+                cached_input_tokens=_cached_input_tokens(source),
             )
     return None
 
@@ -299,6 +309,27 @@ def _token_count(source: Mapping[Any, Any], *names: str) -> int | None:
         value = source.get(name)
         if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
             return value
+    return None
+
+
+def _cached_input_tokens(source: Mapping[Any, Any]) -> int | None:
+    direct = _token_count(
+        source,
+        "cached_input_tokens",
+        "cached_prompt_tokens",
+        "cached_tokens",
+    )
+    if direct is not None:
+        return direct
+    for details_name, token_name in (
+        ("input_token_details", "cache_read"),
+        ("prompt_tokens_details", "cached_tokens"),
+    ):
+        details = source.get(details_name)
+        if isinstance(details, Mapping):
+            value = _token_count(details, token_name)
+            if value is not None:
+                return value
     return None
 
 
