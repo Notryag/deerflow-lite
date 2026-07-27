@@ -45,6 +45,7 @@ async def _assert_runtime_journal_events() -> None:
                                 "input_tokens": 10,
                                 "output_tokens": 4,
                                 "total_tokens": 14,
+                                "input_token_details": {"cache_read": 8},
                             },
                         )
                     )
@@ -73,6 +74,7 @@ async def _assert_runtime_journal_events() -> None:
     ]
     assert events[0].metadata["caller"] == "lead_agent"
     assert events[1].metadata["usage"]["total_tokens"] == 14
+    assert events[1].metadata["usage"]["cached_input_tokens"] == 8
     assert events[1].metadata["call_index"] == 1
     assert events[1].content["tool_calls"][0]["name"] == "create_task"
     assert events[2].metadata["call_id"] == str(tool_run_id)
