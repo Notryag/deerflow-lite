@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from dataclasses import replace
+from typing import Any
 
 from langchain.agents import create_agent
 from langchain.chat_models import init_chat_model
@@ -8,16 +10,27 @@ from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import SystemMessage
 from langchain_core.messages.utils import count_tokens_approximately
 
-from .config import AppConfig
 from .agents.middlewares import CompactionHook, NorthSummarizationMiddleware
+from .config import AppConfig
 from .runtime import (
     get_checkpointer as resolve_checkpointer,
+)
+from .runtime import (
     get_middlewares as resolve_middlewares,
+)
+from .runtime import (
     get_skills as resolve_skills,
+)
+from .runtime import (
     get_state_schema,
+)
+from .runtime import (
     get_system_prompt as resolve_system_prompt,
+)
+from .runtime import (
     get_tools as resolve_tools,
 )
+from .subagents import SubagentSpec, create_subagent_tool
 
 
 def _supports_tool_binding(model) -> bool:
@@ -63,6 +76,38 @@ def build_agent(
     checkpointer=None,
     skills: Sequence[str] | None = None,
     compaction_hooks: list[CompactionHook] | None = None,
+    subagents: Sequence[SubagentSpec] | None = None,
+    response_format: Any | None = None,
+):
+    resolved_checkpointer = (
+        checkpointer if checkpointer is not None else resolve_checkpointer(config)
+    )
+    return _build_agent(
+        config,
+        tools=tools,
+        middlewares=middlewares,
+        additional_middlewares=additional_middlewares,
+        checkpointer=resolved_checkpointer,
+        skills=skills,
+        compaction_hooks=compaction_hooks,
+        subagents=subagents,
+        response_format=response_format,
+        caller_tag="lead_agent",
+    )
+
+
+def _build_agent(
+    config: AppConfig,
+    *,
+    tools: list | None,
+    middlewares,
+    additional_middlewares,
+    checkpointer,
+    skills: Sequence[str] | None,
+    compaction_hooks: list[CompactionHook] | None,
+    subagents: Sequence[SubagentSpec] | None,
+    response_format: Any | None,
+    caller_tag: str,
 ):
     model_kwargs = {
         "name": config.model_name,
@@ -73,9 +118,42 @@ def build_agent(
     if config.model_options:
         model_kwargs["model_options"] = config.model_options
     model = create_chat_model(**model_kwargs)
+    supports_tool_binding = _supports_tool_binding(model)
+    with_config = getattr(model, "with_config", None)
+    if callable(with_config):
+        model = with_config(tags=[caller_tag])
     resolved_skills = resolve_skills(config, skill_names=skills)
-    resolved_tools = tools if tools is not None else resolve_tools(config, skills=resolved_skills)
-    if not _supports_tool_binding(model):
+    resolved_tools = (
+        list(tools) if tools is not None else list(resolve_tools(config, skills=resolved_skills))
+    )
+    if subagents:
+        existing_tool_names = {_tool_name(tool) for tool in resolved_tools}
+        delegation_names: set[str] = set()
+        for spec in subagents:
+            if spec.tool_name in existing_tool_names or spec.tool_name in delegation_names:
+                raise ValueError(f"Duplicate delegation tool name: {spec.tool_name}")
+            delegation_names.add(spec.tool_name)
+            child_config = replace(
+                config,
+                system_prompt=spec.system_prompt,
+                skills_dir=(config.skills_dir if spec.skills else None),
+                enabled_skills=spec.skills,
+                recursion_limit=spec.recursion_limit,
+            )
+            child_agent = _build_agent(
+                child_config,
+                tools=list(spec.tools),
+                middlewares=None,
+                additional_middlewares=None,
+                checkpointer=None,
+                skills=(spec.skills if spec.skills else None),
+                compaction_hooks=None,
+                subagents=None,
+                response_format=spec.result_schema,
+                caller_tag=f"subagent:{spec.name}",
+            )
+            resolved_tools.append(create_subagent_tool(spec, child_agent))
+    if not supports_tool_binding:
         resolved_tools = []
     system_prompt = resolve_system_prompt(config, skills=resolved_skills)
 
@@ -121,5 +199,11 @@ def build_agent(
         middleware=resolved_middlewares,
         system_prompt=system_prompt,
         state_schema=get_state_schema(),
-        checkpointer=checkpointer if checkpointer is not None else resolve_checkpointer(config),
+        checkpointer=checkpointer,
+        response_format=response_format,
     )
+
+
+def _tool_name(tool: Any) -> str:
+    name = getattr(tool, "name", None) or getattr(tool, "__name__", None)
+    return str(name) if name is not None else ""

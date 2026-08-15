@@ -63,6 +63,20 @@
 
 - 创建 model
 - 调用 `create_agent(...)`
+- 将宿主提供的 `SubagentSpec` 编译为无 Checkpointer 的专业 Agent，并只向主 Agent 暴露委派工具
+
+### `packages/harness/north/subagents.py`
+
+- 定义产品无关的 Subagent 声明和委派工具
+- 传播父调用 callback、context、取消和 thread 资源作用域
+- 隔离 Checkpointer、工具集合、Skill 可见性和 graph state
+- 将结构化结果或最终文本序列化为主 Agent 可消费的工具结果
+
+说明：
+
+- North 不定义 Case Analyst、Researcher 等产品角色
+- Skill frontmatter 的工具列表不自动成为权限来源；Subagent 工具必须由宿主显式传入
+- Subagent 不写产品消息、业务记忆或 Run
 
 ### `packages/harness/north/client.py`
 

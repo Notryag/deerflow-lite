@@ -239,3 +239,21 @@
   完成标准：
   `additional_middlewares` 追加在 runtime 默认 middleware 之后，不改变显式
   `middlewares` 覆盖入口，也不要求宿主复制 North 的默认装配。
+
+### P6 宿主委派能力
+
+- [x] S6. 最小 Subagent 委派契约
+  目标：
+  由 Lexora 的法律 Supervisor 需求验证产品无关的有界 Subagent 执行边界。
+  关联文件：
+  `packages/harness/north/subagents.py`
+  `packages/harness/north/agent.py`
+  `packages/harness/north/runtime/events.py`
+  `packages/harness/north/__init__.py`
+  `tests/test_subagents.py`
+  `tests/test_agent.py`
+  `docs/architecture/subagents.md`
+  完成标准：
+  `SubagentSpec` 声明独立 prompt、显式 Tools、Skills、结果 schema、超时和 recursion limit；
+  `build_agent` 将无 Checkpointer 的专业 Agent 暴露为委派工具，并在父 Run callbacks、context
+  和取消链中以 `subagent:<name>` 标记模型调用。第一版不支持嵌套或业务记忆。

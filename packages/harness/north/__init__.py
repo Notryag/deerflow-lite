@@ -1,27 +1,32 @@
 """Reusable runtime primitives for North Agent host applications."""
 
 from .agent import build_agent
-from .agents.middlewares import CompactionEvent, CompactionHook, NorthSummarizationMiddleware
+from .agents.middlewares import (
+    CompactionEvent,
+    CompactionHook,
+    NorthSummarizationMiddleware,
+)
 from .checkpointer import CheckpointerConfig, make_checkpointer
 from .client import AppClient, ChatResponse, StreamEvent
 from .config import AppConfig
 from .runtime import (
-    RuntimeEvent,
-    RuntimeEventSink,
-    RuntimeJournal,
-    RuntimeExecutionResult,
-    RuntimeStreamEvent,
-    RuntimeUsageAccumulator,
+    ClarificationRequest,
     MemoryStreamBridge,
     RedisStreamBridge,
     RunExecutor,
     RunLifecycleHooks,
-    ClarificationRequest,
+    RuntimeEvent,
+    RuntimeEventSink,
+    RuntimeExecutionResult,
+    RuntimeJournal,
+    RuntimeStreamEvent,
+    RuntimeUsageAccumulator,
     StreamBridge,
     TokenUsage,
     invoke_agent_once,
     normalize_token_usage,
 )
+from .subagents import SubagentSpec, create_subagent_tool
 
 __all__ = [
     "AppClient",
@@ -31,21 +36,23 @@ __all__ = [
     "ClarificationRequest",
     "CompactionEvent",
     "CompactionHook",
-    "NorthSummarizationMiddleware",
     "MemoryStreamBridge",
+    "NorthSummarizationMiddleware",
     "RedisStreamBridge",
+    "RunExecutor",
+    "RunLifecycleHooks",
     "RuntimeEvent",
     "RuntimeEventSink",
     "RuntimeExecutionResult",
     "RuntimeJournal",
     "RuntimeStreamEvent",
     "RuntimeUsageAccumulator",
-    "RunExecutor",
-    "RunLifecycleHooks",
     "StreamBridge",
     "StreamEvent",
+    "SubagentSpec",
     "TokenUsage",
     "build_agent",
+    "create_subagent_tool",
     "invoke_agent_once",
     "make_checkpointer",
     "normalize_token_usage",

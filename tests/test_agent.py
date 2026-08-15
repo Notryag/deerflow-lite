@@ -1,7 +1,9 @@
-import pytest
+from types import SimpleNamespace
 
+import pytest
 from north.agent import build_agent, create_chat_model
 from north.config import AppConfig
+from north.subagents import SubagentSpec
 
 
 def test_create_chat_model_defaults_plain_names_to_openai_provider(monkeypatch):
@@ -186,3 +188,73 @@ def test_build_agent_appends_host_middlewares_after_runtime_defaults(monkeypatch
     )
 
     assert captured["middleware"] == [runtime_middleware, host_middleware]
+
+
+def test_build_agent_isolates_subagent_tools_and_checkpointer(monkeypatch):
+    calls = []
+    model_tags = []
+    parent_checkpointer = object()
+    lead_tool = SimpleNamespace(name="lead_tool")
+    specialist_tool = SimpleNamespace(name="specialist_tool")
+
+    class StubModel:
+        def with_config(self, **kwargs):
+            model_tags.append(kwargs["tags"])
+            return self
+
+    monkeypatch.setattr("north.agent.create_chat_model", lambda *args, **kwargs: StubModel())
+    monkeypatch.setattr("north.agent._supports_tool_binding", lambda model: True)
+    monkeypatch.setattr(
+        "north.agent.create_agent",
+        lambda **kwargs: calls.append(kwargs) or object(),
+    )
+
+    build_agent(
+        AppConfig(model_name="openai:gpt-test", system_prompt="Lead prompt."),
+        tools=[lead_tool],
+        checkpointer=parent_checkpointer,
+        subagents=[
+            SubagentSpec(
+                name="case_analyst",
+                description="Frame one legal case.",
+                system_prompt="Specialist prompt.",
+                tools=(specialist_tool,),
+                result_schema=dict,
+                recursion_limit=10,
+            )
+        ],
+    )
+
+    child_call, lead_call = calls
+    assert child_call["system_prompt"] == "Specialist prompt."
+    assert child_call["tools"] == [specialist_tool]
+    assert child_call["checkpointer"] is None
+    assert child_call["response_format"] is dict
+    assert [tool.name for tool in lead_call["tools"]] == [
+        "lead_tool",
+        "delegate_case_analyst",
+    ]
+    assert lead_call["checkpointer"] is parent_checkpointer
+    assert lead_call["response_format"] is None
+    assert model_tags == [["lead_agent"], ["subagent:case_analyst"]]
+
+
+def test_build_agent_rejects_delegation_tool_collision(monkeypatch):
+    class StubModel:
+        pass
+
+    monkeypatch.setattr("north.agent.create_chat_model", lambda *args, **kwargs: StubModel())
+    monkeypatch.setattr("north.agent._supports_tool_binding", lambda model: True)
+
+    with pytest.raises(ValueError, match="Duplicate delegation tool name"):
+        build_agent(
+            AppConfig(model_name="openai:gpt-test"),
+            tools=[SimpleNamespace(name="delegate_case_analyst")],
+            subagents=[
+                SubagentSpec(
+                    name="case_analyst",
+                    description="Frame one legal case.",
+                    system_prompt="Specialist prompt.",
+                )
+            ],
+        )

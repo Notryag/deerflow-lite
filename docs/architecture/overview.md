@@ -30,6 +30,8 @@ Runtime Event Sink
 
 - `AppConfig` 承载 Runtime 配置和宿主选择的路径
 - `build_agent` 装配模型、工具、Skill、Middleware 和 Checkpointer
+- `SubagentSpec` 让宿主声明有界、无持久化的专业 Agent；`build_agent` 将其装配为主 Agent
+  的委派工具
 - `invoke_agent_once` 提供产品无关的单次执行入口
 - `AppClient` 提供示例聊天和流式 Run 封装
 
@@ -43,6 +45,7 @@ Runtime Event Sink
 
 - 模型与工具调用转换为稳定 Runtime Event
 - Token 用量在 Runtime 层归一化
+- 子 Agent 模型调用在同一父 Run 中使用 `subagent:<name>` 归属
 - 宿主决定事件持久化、传输、审计和计费方式
 
 ### 运行保护
