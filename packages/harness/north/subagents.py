@@ -64,7 +64,7 @@ class SubagentSpec:
 def create_subagent_tool(spec: SubagentSpec, agent: Any) -> StructuredTool:
     """Expose one compiled subagent as a bounded delegation tool."""
 
-    async def delegate(task: str, *, runtime: ToolRuntime) -> str:
+    async def delegate(task: str, *, runtime: ToolRuntime[dict[str, Any]]) -> str:
         normalized_task = task.strip()
         if not normalized_task:
             raise ValueError("subagent task cannot be blank")

@@ -22,8 +22,8 @@ Host Run
 North owns agent construction, delegation execution, callback propagation, timeout, generic event
 attribution, and result serialization. The host owns role prompts, task schemas, tool implementations,
 authorization, business memory, persistence, budgets beyond the per-call limits, and the final answer.
-North graphs declare a dictionary runtime context schema so the host's parent Run context can pass to
-subagent tools without becoming graph state or producing serializer ambiguity.
+North graphs and delegation tools declare a dictionary runtime context schema so the host's parent
+Run context can pass to subagent tools without becoming graph state or producing serializer ambiguity.
 
 ## Invariants
 
