@@ -199,6 +199,7 @@ def _build_agent(
         middleware=resolved_middlewares,
         system_prompt=system_prompt,
         state_schema=get_state_schema(),
+        context_schema=dict,
         checkpointer=checkpointer,
         response_format=response_format,
     )

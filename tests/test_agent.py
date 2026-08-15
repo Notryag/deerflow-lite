@@ -236,6 +236,8 @@ def test_build_agent_isolates_subagent_tools_and_checkpointer(monkeypatch):
     ]
     assert lead_call["checkpointer"] is parent_checkpointer
     assert lead_call["response_format"] is None
+    assert child_call["context_schema"] is dict
+    assert lead_call["context_schema"] is dict
     assert model_tags == [["lead_agent"], ["subagent:case_analyst"]]
 
 
