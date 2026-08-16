@@ -3,7 +3,6 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 from langchain_core.messages import AIMessage
-
 from north import (
     RuntimeEvent,
     RuntimeJournal,
@@ -94,6 +93,97 @@ def test_normalizes_provider_usage_aliases_and_derives_total() -> None:
         "output_tokens": 3,
         "total_tokens": 15,
     }
+
+
+def test_runtime_journal_attributes_subagent_steps_to_delegation() -> None:
+    asyncio.run(_assert_subagent_event_lineage())
+
+
+async def _assert_subagent_event_lineage() -> None:
+    events: list[RuntimeEvent] = []
+
+    async def sink(event: RuntimeEvent) -> None:
+        events.append(event)
+
+    journal = RuntimeJournal(sink)
+    lead_chain_id = uuid4()
+    task_id = uuid4()
+    child_chain_id = uuid4()
+    child_model_id = uuid4()
+    child_tool_id = uuid4()
+
+    await journal.on_chain_start({}, {}, run_id=lead_chain_id)
+    await journal.on_tool_start(
+        {"name": "delegate_case_analyst"},
+        "",
+        run_id=task_id,
+        parent_run_id=lead_chain_id,
+        tags=["lead_agent"],
+        inputs={"task": "整理案件事实"},
+    )
+    await journal.on_chain_start(
+        {},
+        {},
+        run_id=child_chain_id,
+        parent_run_id=task_id,
+    )
+    await journal.on_chat_model_start(
+        {},
+        [[]],
+        run_id=child_model_id,
+        parent_run_id=child_chain_id,
+        tags=["subagent:case_analyst"],
+    )
+    await journal.on_llm_end(
+        SimpleNamespace(
+            generations=[
+                [SimpleNamespace(message=AIMessage(content="已识别案件事实。"))]
+            ]
+        ),
+        run_id=child_model_id,
+        tags=["subagent:case_analyst"],
+    )
+    await journal.on_tool_start(
+        {"name": "search_case_materials"},
+        "",
+        run_id=child_tool_id,
+        parent_run_id=child_chain_id,
+        tags=["subagent:case_analyst"],
+        inputs={"query": "解除通知"},
+    )
+    await journal.on_tool_end([{"reference": "M1:C1"}], run_id=child_tool_id)
+    await journal.on_tool_end(
+        {"subagent": "case_analyst", "result": {"facts": 1}},
+        run_id=task_id,
+    )
+
+    subagent_events = [event for event in events if event.category == "subagent"]
+    assert [event.event_type for event in subagent_events] == [
+        "subagent.start",
+        "subagent.step",
+        "subagent.step",
+        "subagent.end",
+    ]
+    assert subagent_events[0].content == {
+        "task_id": str(task_id),
+        "description": "整理案件事实",
+    }
+    assert [event.content["message_index"] for event in subagent_events[1:3]] == [
+        0,
+        1,
+    ]
+    assert subagent_events[1].content["kind"] == "ai"
+    assert subagent_events[2].content["kind"] == "tool"
+    assert subagent_events[2].content["tool_name"] == "search_case_materials"
+    assert subagent_events[3].content["status"] == "completed"
+    child_tool_start = next(
+        event
+        for event in events
+        if event.event_type == "tool.started"
+        and event.metadata["tool_name"] == "search_case_materials"
+    )
+    assert child_tool_start.metadata["caller"] == "subagent:case_analyst"
+    assert child_tool_start.metadata["parent_call_id"] == str(child_chain_id)
 
 
 def test_normalizes_cached_input_token_details_without_inventing_zero() -> None:
