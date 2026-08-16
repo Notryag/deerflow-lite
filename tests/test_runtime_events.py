@@ -25,7 +25,9 @@ async def _assert_runtime_journal_events() -> None:
     journal = RuntimeJournal(sink)
     model_run_id = uuid4()
     tool_run_id = uuid4()
-    await journal.on_chat_model_start({}, [[]], run_id=model_run_id, tags=["lead_agent"])
+    await journal.on_chat_model_start(
+        {}, [[]], run_id=model_run_id, tags=["lead_agent"]
+    )
     await journal.on_llm_end(
         SimpleNamespace(
             generations=[
@@ -184,6 +186,17 @@ async def _assert_subagent_event_lineage() -> None:
     )
     assert child_tool_start.metadata["caller"] == "subagent:case_analyst"
     assert child_tool_start.metadata["parent_call_id"] == str(child_chain_id)
+    child_runtime_events = [
+        event
+        for event in events
+        if event.event_type
+        in {"model.started", "model.completed", "tool.started", "tool.completed"}
+        and event.metadata.get("caller") == "subagent:case_analyst"
+    ]
+    assert len(child_runtime_events) == 4
+    assert {event.metadata.get("task_id") for event in child_runtime_events} == {
+        str(task_id)
+    }
 
 
 def test_normalizes_cached_input_token_details_without_inventing_zero() -> None:
@@ -259,7 +272,10 @@ async def _assert_invoke_agent_once_merges_callbacks() -> None:
     result = await invoke_agent_once(
         agent_factory=StubAgent,
         graph_input={"messages": []},
-        config={"callbacks": [existing_callback], "configurable": {"thread_id": "thread-1"}},
+        config={
+            "callbacks": [existing_callback],
+            "configurable": {"thread_id": "thread-1"},
+        },
         context={"run_id": "run-1"},
         event_sink=sink,
     )

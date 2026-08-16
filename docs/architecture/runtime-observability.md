@@ -23,6 +23,21 @@ Model events include a call ID, caller classification, latency, and usage metada
 Tool events include a call ID, tool name, inputs or output, latency, and errors. Call
 IDs let products correlate a tool start with its terminal event.
 
+Subagent events use the delegation tool call ID as `task_id`. Model and tool events
+executed inside a subagent also carry that `task_id`, in addition to their own
+`call_id`. This gives host products an explicit hierarchy without inferring ownership
+from timestamps or actor names:
+
+```text
+subagent task_id
+  -> model call_id
+  -> tool call_id
+```
+
+Start and terminal events for one invocation always retain the same identifier. North
+does not combine separate calls merely because they use the same tool or subagent type.
+Consumers may collapse detail for presentation, but correlation remains call-accurate.
+
 `north` normalizes model usage to `input_tokens`, `output_tokens`, and `total_tokens`
 across common LangChain and provider field names. `RuntimeUsageAccumulator` aggregates
 the normalized events once per model call, including intermediate tool-selection calls.
@@ -44,6 +59,23 @@ show.
 
 Never emit credentials, system prompts, database connection strings, hidden tenant
 context, or unrestricted tool output to a user-facing stream.
+
+## Product Presentation Contract
+
+North events are execution facts, not ready-made user interface rows. A host-owned
+projector must:
+
+- merge one start and terminal pair by `call_id` or `task_id`;
+- preserve separate invocations of the same tool;
+- use `task_id` for subagent parentage instead of temporal inference;
+- allowlist any tool input used as a user-facing detail;
+- omit raw model output, hidden reasoning, unrestricted tool results, and provider
+  exception text;
+- map technical names to product language outside North.
+
+This deliberately follows DeerFlow's call and task identity model. North does not
+standardize one visual component: a general assistant may use expandable task cards,
+while a focused product may use a compact activity timeline.
 
 ## Tool Message Artifacts
 

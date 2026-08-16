@@ -72,7 +72,10 @@ class RuntimeUsageAccumulator:
             total_tokens=sum(usage.total_tokens for usage in self._calls.values()),
             cached_input_tokens=(
                 sum(usage.cached_input_tokens for usage in self._calls.values())
-                if all(usage.cached_input_tokens is not None for usage in self._calls.values())
+                if all(
+                    usage.cached_input_tokens is not None
+                    for usage in self._calls.values()
+                )
                 else None
             ),
         )
@@ -123,14 +126,16 @@ class RuntimeJournal(AsyncCallbackHandler):
         self._model_started_at[call_id] = time.monotonic()
         self._model_call_index += 1
         self._model_call_indexes[call_id] = self._model_call_index
+        caller = _identify_caller(tags)
         await self._emit(
             "model.started",
             "model",
             metadata={
                 "call_id": call_id,
                 "call_index": self._model_call_index,
-                "caller": _identify_caller(tags),
+                "caller": caller,
                 "parent_call_id": parent_call_id,
+                **self._subagent_task_metadata(call_id, caller),
             },
         )
 
@@ -150,6 +155,7 @@ class RuntimeJournal(AsyncCallbackHandler):
         response_usage = _response_usage(response)
         caller = _identify_caller(tags)
         parent_call_id = self._parents.get(call_id)
+        task_metadata = self._subagent_task_metadata(call_id, caller)
         for index, message in enumerate(_response_messages(response)):
             usage = normalize_token_usage(
                 getattr(message, "usage_metadata", None),
@@ -167,9 +173,10 @@ class RuntimeJournal(AsyncCallbackHandler):
                     "parent_call_id": parent_call_id,
                     "latency_ms": latency_ms,
                     "usage": usage.as_dict() if usage is not None else {},
+                    **task_metadata,
                 },
             )
-            task_id = self._task_for_call(call_id) if caller.startswith("subagent:") else None
+            task_id = task_metadata.get("task_id")
             if task_id is not None:
                 await self._emit_subagent_step(
                     task_id,
@@ -192,6 +199,7 @@ class RuntimeJournal(AsyncCallbackHandler):
         self._model_started_at.pop(call_id, None)
         call_index = self._model_call_indexes.pop(call_id, None)
         caller = _identify_caller(tags)
+        task_metadata = self._subagent_task_metadata(call_id, caller)
         await self._emit(
             "model.error",
             "error",
@@ -200,8 +208,10 @@ class RuntimeJournal(AsyncCallbackHandler):
                 "call_id": call_id,
                 "call_index": call_index,
                 "caller": caller,
-                "parent_call_id": self._parents.get(call_id) or _optional_id(parent_run_id),
+                "parent_call_id": self._parents.get(call_id)
+                or _optional_id(parent_run_id),
                 "error_type": type(error).__name__,
+                **task_metadata,
             },
         )
 
@@ -226,6 +236,7 @@ class RuntimeJournal(AsyncCallbackHandler):
         self._tool_names[call_id] = tool_name
         self._tool_callers[call_id] = caller
         self._tool_parent_ids[call_id] = parent_call_id
+        task_metadata = self._subagent_task_metadata(call_id, caller)
         await self._emit(
             "tool.started",
             "tool",
@@ -235,6 +246,7 @@ class RuntimeJournal(AsyncCallbackHandler):
                 "tool_name": tool_name,
                 "caller": caller,
                 "parent_call_id": parent_call_id,
+                **task_metadata,
             },
         )
         subagent_name = _delegated_subagent_name(tool_name)
@@ -244,7 +256,10 @@ class RuntimeJournal(AsyncCallbackHandler):
             await self._emit(
                 "subagent.start",
                 "subagent",
-                content={"task_id": call_id, "description": _task_description(inputs, input_str)},
+                content={
+                    "task_id": call_id,
+                    "description": _task_description(inputs, input_str),
+                },
                 metadata={
                     "task_id": call_id,
                     "subagent_type": subagent_name,
@@ -260,9 +275,8 @@ class RuntimeJournal(AsyncCallbackHandler):
         tool_name = self._tool_names.pop(call_id, "unknown")
         caller = self._tool_callers.pop(call_id, "unknown")
         parent_call_id = self._tool_parent_ids.pop(call_id, None)
-        latency_ms = (
-            int((time.monotonic() - started_at) * 1000) if started_at else None
-        )
+        task_id = self._task_for_call(call_id)
+        latency_ms = int((time.monotonic() - started_at) * 1000) if started_at else None
         await self._emit(
             "tool.completed",
             "tool",
@@ -273,9 +287,9 @@ class RuntimeJournal(AsyncCallbackHandler):
                 "caller": caller,
                 "parent_call_id": parent_call_id,
                 "latency_ms": latency_ms,
+                **({"task_id": task_id} if task_id is not None else {}),
             },
         )
-        task_id = self._task_for_call(call_id)
         if task_id is not None and call_id != task_id:
             await self._emit_subagent_step(
                 task_id,
@@ -319,12 +333,9 @@ class RuntimeJournal(AsyncCallbackHandler):
         started_at = self._tool_started_at.pop(call_id, None)
         tool_name = self._tool_names.pop(call_id, "unknown")
         caller = self._tool_callers.pop(call_id, _identify_caller(tags))
-        parent_call_id = self._tool_parent_ids.pop(
-            call_id, _optional_id(parent_run_id)
-        )
-        latency_ms = (
-            int((time.monotonic() - started_at) * 1000) if started_at else None
-        )
+        parent_call_id = self._tool_parent_ids.pop(call_id, _optional_id(parent_run_id))
+        task_id = self._task_for_call(call_id)
+        latency_ms = int((time.monotonic() - started_at) * 1000) if started_at else None
         await self._emit(
             "tool.error",
             "error",
@@ -336,6 +347,7 @@ class RuntimeJournal(AsyncCallbackHandler):
                 "parent_call_id": parent_call_id,
                 "error_type": type(error).__name__,
                 "latency_ms": latency_ms,
+                **({"task_id": task_id} if task_id is not None else {}),
             },
         )
         subagent_name = self._subagent_tasks.pop(call_id, None)
@@ -368,6 +380,12 @@ class RuntimeJournal(AsyncCallbackHandler):
             seen.add(current)
             current = self._parents.get(current)
         return None
+
+    def _subagent_task_metadata(self, call_id: str, caller: str) -> dict[str, str]:
+        if not caller.startswith("subagent:"):
+            return {}
+        task_id = self._task_for_call(call_id)
+        return {"task_id": task_id} if task_id is not None else {}
 
     async def _emit_subagent_step(
         self,
