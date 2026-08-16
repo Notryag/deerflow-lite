@@ -160,6 +160,33 @@ async def _assert_typed_clarification_result():
     assert observed == [result]
 
 
+def test_run_executor_can_leave_lifecycle_publication_to_host():
+    asyncio.run(_assert_run_executor_host_lifecycle())
+
+
+async def _assert_run_executor_host_lifecycle():
+    class StubAgent:
+        async def astream(self, graph_input, config=None, context=None, stream_mode=None):
+            del graph_input, config, context
+            assert stream_mode == ["values", "messages"]
+            yield ("messages", ({"type": "AIMessageChunk", "content": "好"}, {}))
+            yield ("values", {"messages": []})
+
+    bridge = MemoryStreamBridge()
+    record = RunManager().create(thread_id="thread-1", run_id="run-host")
+    await RunExecutor(bridge).execute(
+        record,
+        agent_factory=StubAgent,
+        graph_input={},
+        publish_modes=(),
+        publish_lifecycle=False,
+    )
+    await bridge.publish_end("run-host")
+    events = [event async for event in bridge.subscribe("run-host")]
+
+    assert [event.event for event in events] == [END_SENTINEL.event]
+
+
 def test_run_executor_preserves_tool_message_artifact_in_canonical_stream():
     asyncio.run(_assert_tool_message_artifact_stream())
 

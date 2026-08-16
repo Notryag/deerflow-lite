@@ -44,6 +44,7 @@ class RunExecutor:
         lifecycle_hooks: RunLifecycleHooks | None = None,
         stream_modes: Sequence[str] = ("values", "messages"),
         publish_modes: Sequence[str] = ("messages",),
+        publish_lifecycle: bool = True,
     ) -> RuntimeExecutionResult:
         requested_modes = tuple(stream_modes)
         published_modes = frozenset(publish_modes)
@@ -56,11 +57,12 @@ class RunExecutor:
         latest_values: Any = {}
         try:
             self._set_status(record.run_id, RunStatus.running)
-            await self._bridge.publish(
-                record.run_id,
-                "metadata",
-                {"run_id": record.run_id, "thread_id": record.thread_id},
-            )
+            if publish_lifecycle:
+                await self._bridge.publish(
+                    record.run_id,
+                    "metadata",
+                    {"run_id": record.run_id, "thread_id": record.thread_id},
+                )
             agent = agent_factory()
             astream = getattr(agent, "astream", None)
             if not callable(astream):
@@ -107,14 +109,16 @@ class RunExecutor:
             self._set_status(record.run_id, RunStatus.error, error=str(exc))
             if hooks.on_error is not None:
                 await hooks.on_error(exc)
-            await self._bridge.publish(
-                record.run_id,
-                "error",
-                {"message": str(exc), "error_type": type(exc).__name__},
-            )
+            if publish_lifecycle:
+                await self._bridge.publish(
+                    record.run_id,
+                    "error",
+                    {"message": str(exc), "error_type": type(exc).__name__},
+                )
             raise
         finally:
-            await self._bridge.publish_end(record.run_id)
+            if publish_lifecycle:
+                await self._bridge.publish_end(record.run_id)
 
     def _set_status(
         self,
