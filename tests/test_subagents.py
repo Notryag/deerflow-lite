@@ -127,6 +127,43 @@ def test_delegation_tool_returns_structured_response() -> None:
     }
 
 
+def test_delegation_tool_processes_structured_result_with_runtime() -> None:
+    agent = StubAgent(
+        {
+            "messages": [AIMessage(content="internal draft")],
+            "structured_response": {"intent": "legal_question"},
+        }
+    )
+    observed = []
+
+    async def process(result, tool_runtime):
+        observed.append((result, tool_runtime.context))
+        return {"assessment": result, "response_contract": {"answer_first": True}}
+
+    spec = SubagentSpec(
+        name="case_analyst",
+        description="Frame one legal case.",
+        system_prompt="Analyze grounded facts.",
+        result_schema=dict,
+        result_processor=process,
+    )
+
+    result = asyncio.run(
+        create_subagent_tool(spec, agent).coroutine(
+            "整理案件",
+            runtime=runtime(context={"run_id": "run-1"}),
+        )
+    )
+
+    assert observed == [
+        ({"intent": "legal_question"}, {"run_id": "run-1"})
+    ]
+    assert json.loads(result)["result"] == {
+        "assessment": {"intent": "legal_question"},
+        "response_contract": {"answer_first": True},
+    }
+
+
 def test_delegation_tool_enforces_timeout() -> None:
     class SlowAgent:
         async def ainvoke(self, graph_input, *, config=None, context=None):

@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import json
 import re
-from collections.abc import Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -12,6 +13,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.tools import StructuredTool
 
 _SUBAGENT_NAME_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
+SubagentResultProcessor = Callable[[Any, ToolRuntime[dict[str, Any]]], Any | Awaitable[Any]]
 
 
 @dataclass(frozen=True, slots=True)
@@ -24,6 +26,7 @@ class SubagentSpec:
     tools: tuple[Any, ...] = ()
     skills: tuple[str, ...] = ()
     result_schema: Any | None = None
+    result_processor: SubagentResultProcessor | None = None
     timeout_seconds: float = 90.0
     recursion_limit: int = 20
 
@@ -79,7 +82,11 @@ def create_subagent_tool(spec: SubagentSpec, agent: Any) -> StructuredTool:
                 config=config,
                 context=runtime.context,
             )
-        return _render_subagent_result(spec, result)
+        payload = _subagent_result_payload(spec, result)
+        if spec.result_processor is not None:
+            processed = spec.result_processor(payload, runtime)
+            payload = await processed if inspect.isawaitable(processed) else processed
+        return _render_subagent_result(spec, payload)
 
     return StructuredTool.from_function(
         coroutine=delegate,
@@ -111,7 +118,7 @@ def _subagent_config(config: Mapping[str, Any] | None, spec: SubagentSpec) -> di
     return resolved
 
 
-def _render_subagent_result(spec: SubagentSpec, result: Any) -> str:
+def _subagent_result_payload(spec: SubagentSpec, result: Any) -> Any:
     if not isinstance(result, Mapping):
         raise TypeError("Subagent result must be a graph-state mapping")
 
@@ -119,14 +126,16 @@ def _render_subagent_result(spec: SubagentSpec, result: Any) -> str:
         structured = result.get("structured_response")
         if structured is None:
             raise RuntimeError("Subagent completed without a structured response")
-        payload = _serialize_value(structured)
-    else:
-        payload = _final_assistant_text(result.get("messages"))
-        if not payload:
-            raise RuntimeError("Subagent completed without a final assistant response")
+        return structured
+    payload = _final_assistant_text(result.get("messages"))
+    if not payload:
+        raise RuntimeError("Subagent completed without a final assistant response")
+    return payload
 
+
+def _render_subagent_result(spec: SubagentSpec, payload: Any) -> str:
     return json.dumps(
-        {"subagent": spec.name, "result": payload},
+        {"subagent": spec.name, "result": _serialize_value(payload)},
         ensure_ascii=False,
         separators=(",", ":"),
     )
