@@ -119,7 +119,7 @@ async def _assert_subagent_event_lineage() -> None:
         run_id=task_id,
         parent_run_id=lead_chain_id,
         tags=["lead_agent"],
-        inputs={"task": "整理案件事实"},
+        inputs={"description": "梳理案件事实", "task": "提取事实与问题"},
     )
     await journal.on_chain_start(
         {},
@@ -166,7 +166,7 @@ async def _assert_subagent_event_lineage() -> None:
     ]
     assert subagent_events[0].content == {
         "task_id": str(task_id),
-        "description": "整理案件事实",
+        "description": "梳理案件事实",
     }
     assert [event.content["message_index"] for event in subagent_events[1:3]] == [
         0,

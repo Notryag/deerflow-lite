@@ -24,6 +24,10 @@ attribution, and result serialization. The host owns role prompts, task schemas,
 authorization, business memory, persistence, budgets beyond the per-call limits, and the final answer.
 North graphs and delegation tools declare a dictionary runtime context schema so the host's parent
 Run context can pass to subagent tools without becoming graph state or producing serializer ambiguity.
+Each delegation carries a short user-facing `description` separately from its bounded `task`, matching
+DeerFlow's observable task contract. A host may also provide `SubagentSpec.input_builder` to attach an
+exact, host-owned context projection to the child input. North invokes that callback but never chooses,
+stores, or interprets the business data it returns.
 
 ## Invariants
 
@@ -32,6 +36,8 @@ Run context can pass to subagent tools without becoming graph state or producing
 - Only tools explicitly assigned to the subagent are visible to it.
 - Skills are explicitly selected per subagent and remain prompt/runtime scope rather than thread state.
 - Parent callbacks and runtime context propagate so model usage and errors remain observable.
+- The lead model does not need to reproduce lossless host context inside the task when an input builder
+  is configured; the model still decides whether to delegate and states the specialist objective.
 - Subagent model calls carry `subagent:<name>` attribution.
 - Cancellation propagates naturally; a host-selected timeout bounds each delegation.
 - The tool result contains only the subagent's structured response or final assistant text.

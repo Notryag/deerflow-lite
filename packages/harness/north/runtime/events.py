@@ -437,6 +437,9 @@ def _delegated_subagent_name(tool_name: str) -> str | None:
 
 def _task_description(inputs: dict[str, Any] | None, input_str: str) -> str:
     if isinstance(inputs, Mapping):
+        description = inputs.get("description")
+        if isinstance(description, str) and description.strip():
+            return description.strip()
         task = inputs.get("task")
         if isinstance(task, str):
             return task

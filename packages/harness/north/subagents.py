@@ -14,6 +14,9 @@ from langchain_core.tools import StructuredTool
 
 _SUBAGENT_NAME_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
 SubagentResultProcessor = Callable[[Any, ToolRuntime[dict[str, Any]]], Any | Awaitable[Any]]
+SubagentInputBuilder = Callable[
+    [str, ToolRuntime[dict[str, Any]]], str | Awaitable[str]
+]
 
 
 @dataclass(frozen=True, slots=True)
@@ -27,6 +30,7 @@ class SubagentSpec:
     skills: tuple[str, ...] = ()
     result_schema: Any | None = None
     result_processor: SubagentResultProcessor | None = None
+    input_builder: SubagentInputBuilder | None = None
     timeout_seconds: float = 90.0
     recursion_limit: int = 20
 
@@ -67,10 +71,25 @@ class SubagentSpec:
 def create_subagent_tool(spec: SubagentSpec, agent: Any) -> StructuredTool:
     """Expose one compiled subagent as a bounded delegation tool."""
 
-    async def delegate(task: str, *, runtime: ToolRuntime[dict[str, Any]]) -> str:
+    async def delegate(
+        description: str,
+        task: str,
+        *,
+        runtime: ToolRuntime[dict[str, Any]],
+    ) -> str:
+        normalized_description = description.strip()
+        if not normalized_description:
+            raise ValueError("subagent description cannot be blank")
         normalized_task = task.strip()
         if not normalized_task:
             raise ValueError("subagent task cannot be blank")
+        child_input = normalized_task
+        if spec.input_builder is not None:
+            built = spec.input_builder(normalized_task, runtime)
+            child_input = await built if inspect.isawaitable(built) else built
+            if not isinstance(child_input, str) or not child_input.strip():
+                raise ValueError("subagent input_builder must return non-blank text")
+            child_input = child_input.strip()
         ainvoke = getattr(agent, "ainvoke", None)
         if not callable(ainvoke):
             raise TypeError("Subagent does not expose ainvoke")
@@ -78,7 +97,7 @@ def create_subagent_tool(spec: SubagentSpec, agent: Any) -> StructuredTool:
         config = _subagent_config(runtime.config, spec)
         async with asyncio.timeout(spec.timeout_seconds):
             result = await ainvoke(
-                {"messages": [HumanMessage(content=normalized_task)]},
+                {"messages": [HumanMessage(content=child_input)]},
                 config=config,
                 context=runtime.context,
             )
@@ -93,7 +112,9 @@ def create_subagent_tool(spec: SubagentSpec, agent: Any) -> StructuredTool:
         name=spec.tool_name,
         description=(
             f"Delegate one bounded task to the {spec.name} specialist. "
-            f"{spec.description} Return its result to the lead agent for synthesis."
+            f"{spec.description} Give description a short user-facing activity label, then give "
+            "task only the specialist's objective and boundaries. Return its result to the lead "
+            "agent for synthesis."
         ),
     )
 

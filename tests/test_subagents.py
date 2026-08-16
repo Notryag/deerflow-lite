@@ -68,7 +68,8 @@ def test_delegation_tool_propagates_parent_runtime_without_checkpoint() -> None:
 
     result = asyncio.run(
         tool.coroutine(
-            "整理本轮案件事实",
+            description="梳理案件事实",
+            task="整理本轮案件事实",
             runtime=runtime(
                 config={
                     "callbacks": [callback],
@@ -87,7 +88,10 @@ def test_delegation_tool_propagates_parent_runtime_without_checkpoint() -> None:
         "subagent": "case_analyst",
         "result": "争议焦点已整理。",
     }
-    assert set(tool.tool_call_schema.model_json_schema()["properties"]) == {"task"}
+    assert set(tool.tool_call_schema.model_json_schema()["properties"]) == {
+        "description",
+        "task",
+    }
     call = agent.calls[0]
     assert call["graph_input"]["messages"][0].content == "整理本轮案件事实"
     assert call["config"]["callbacks"] == [callback]
@@ -116,7 +120,8 @@ def test_delegation_tool_returns_structured_response() -> None:
 
     result = asyncio.run(
         create_subagent_tool(spec, agent).coroutine(
-            "整理案件",
+            description="梳理案件事实",
+            task="整理案件",
             runtime=runtime(),
         )
     )
@@ -150,7 +155,8 @@ def test_delegation_tool_processes_structured_result_with_runtime() -> None:
 
     result = asyncio.run(
         create_subagent_tool(spec, agent).coroutine(
-            "整理案件",
+            description="梳理案件事实",
+            task="整理案件",
             runtime=runtime(context={"run_id": "run-1"}),
         )
     )
@@ -181,7 +187,37 @@ def test_delegation_tool_enforces_timeout() -> None:
     with pytest.raises(TimeoutError):
         asyncio.run(
             create_subagent_tool(spec, SlowAgent()).coroutine(
-                "研究法规",
+                description="研究法规依据",
+                task="研究法规",
                 runtime=runtime(),
             )
         )
+
+
+def test_delegation_tool_uses_host_owned_input_builder() -> None:
+    agent = StubAgent({"messages": [AIMessage(content="完成")]})
+    observed = []
+
+    def build_input(task, tool_runtime):
+        observed.append((task, tool_runtime.context))
+        return f"{task}\n<context>{tool_runtime.context['case_data']}</context>"
+
+    spec = SubagentSpec(
+        name="case_analyst",
+        description="Frame one legal case.",
+        system_prompt="Analyze grounded facts.",
+        input_builder=build_input,
+    )
+
+    asyncio.run(
+        create_subagent_tool(spec, agent).coroutine(
+            description="梳理案件事实",
+            task="提取事实和问题",
+            runtime=runtime(context={"case_data": "用户原话"}),
+        )
+    )
+
+    assert observed == [("提取事实和问题", {"case_data": "用户原话"})]
+    assert agent.calls[0]["graph_input"]["messages"][0].content == (
+        "提取事实和问题\n<context>用户原话</context>"
+    )
