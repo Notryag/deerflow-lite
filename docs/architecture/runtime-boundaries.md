@@ -62,12 +62,13 @@
 ### `packages/harness/north/agent.py`
 
 - 创建 model
+- 安装宿主提供的 Plugin
 - 调用 `create_agent(...)`
-- 将宿主提供的 `SubagentSpec` 编译为无 Checkpointer 的专业 Agent，并只向主 Agent 暴露委派工具
+- 将 Plugin 注册的 `AgentDefinition` 转换为委派工具，并在委派时创建无 Checkpointer 的专业 Agent
 
 ### `packages/harness/north/subagents.py`
 
-- 定义产品无关的 Subagent 声明和委派工具
+- 定义产品无关的 Agent Definition 和委派工具
 - 传播父调用 callback、context、取消和 thread 资源作用域
 - 隔离 Checkpointer、工具集合、Skill 可见性和 graph state
 - 将结构化结果或最终文本序列化为主 Agent 可消费的工具结果

@@ -29,9 +29,8 @@ Runtime Event Sink
 ### 宿主装配
 
 - `AppConfig` 承载 Runtime 配置和宿主选择的路径
-- `build_agent` 装配模型、工具、Skill、Middleware 和 Checkpointer
-- `SubagentSpec` 让宿主声明有界、无持久化的专业 Agent；`build_agent` 将其装配为主 Agent
-  的委派工具
+- `build_agent` 装配模型、Skill、Checkpointer 和宿主提供的 Plugin
+- Plugin 负责注册工具、Middleware、Provider 和 `AgentDefinition`；子 Agent 在委派时懒创建
 - `invoke_agent_once` 提供产品无关的单次执行入口
 - `AppClient` 提供示例聊天和流式 Run 封装
 

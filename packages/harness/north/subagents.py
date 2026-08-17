@@ -12,16 +12,17 @@ from langchain.tools import ToolRuntime
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.tools import StructuredTool
 
-_SUBAGENT_NAME_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
-SubagentResultProcessor = Callable[[Any, ToolRuntime[dict[str, Any]]], Any | Awaitable[Any]]
-SubagentInputBuilder = Callable[
+_AGENT_NAME_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
+AgentResultProcessor = Callable[[Any, ToolRuntime[dict[str, Any]]], Any | Awaitable[Any]]
+AgentInputBuilder = Callable[
     [str, ToolRuntime[dict[str, Any]]], str | Awaitable[str]
 ]
+AgentBuilder = Callable[["AgentDefinition"], Any]
 
 
 @dataclass(frozen=True, slots=True)
-class SubagentSpec:
-    """Host-owned declaration for one bounded, stateless specialist agent."""
+class AgentDefinition:
+    """Host-owned declaration for one bounded specialist Agent role."""
 
     name: str
     description: str
@@ -29,8 +30,8 @@ class SubagentSpec:
     tools: tuple[Any, ...] = ()
     skills: tuple[str, ...] = ()
     result_schema: Any | None = None
-    result_processor: SubagentResultProcessor | None = None
-    input_builder: SubagentInputBuilder | None = None
+    result_processor: AgentResultProcessor | None = None
+    input_builder: AgentInputBuilder | None = None
     timeout_seconds: float = 90.0
     recursion_limit: int = 20
 
@@ -38,19 +39,19 @@ class SubagentSpec:
         name = self.name.strip()
         description = self.description.strip()
         system_prompt = self.system_prompt.strip()
-        if not _SUBAGENT_NAME_PATTERN.fullmatch(name):
+        if not _AGENT_NAME_PATTERN.fullmatch(name):
             raise ValueError(
-                "subagent name must start with a lowercase letter and contain only "
-                "lowercase letters, digits, and underscores"
+                "agent definition name must start with a lowercase letter and contain "
+                "only lowercase letters, digits, and underscores"
             )
         if not description:
-            raise ValueError("subagent description cannot be blank")
+            raise ValueError("agent definition description cannot be blank")
         if not system_prompt:
-            raise ValueError("subagent system_prompt cannot be blank")
+            raise ValueError("agent definition system_prompt cannot be blank")
         if isinstance(self.timeout_seconds, bool) or self.timeout_seconds <= 0:
-            raise ValueError("subagent timeout_seconds must be positive")
+            raise ValueError("agent definition timeout_seconds must be positive")
         if isinstance(self.recursion_limit, bool) or self.recursion_limit < 2:
-            raise ValueError("subagent recursion_limit must be at least 2")
+            raise ValueError("agent definition recursion_limit must be at least 2")
 
         normalized_skills: list[str] = []
         for raw_name in self.skills:
@@ -68,8 +69,11 @@ class SubagentSpec:
         return f"delegate_{self.name}"
 
 
-def create_subagent_tool(spec: SubagentSpec, agent: Any) -> StructuredTool:
-    """Expose one compiled subagent as a bounded delegation tool."""
+def create_subagent_tool(
+    definition: AgentDefinition,
+    build_child_agent: AgentBuilder,
+) -> StructuredTool:
+    """Expose one lazily-created Agent Definition as a bounded delegation tool."""
 
     async def delegate(
         description: str,
@@ -84,51 +88,56 @@ def create_subagent_tool(spec: SubagentSpec, agent: Any) -> StructuredTool:
         if not normalized_task:
             raise ValueError("subagent task cannot be blank")
         child_input = normalized_task
-        if spec.input_builder is not None:
-            built = spec.input_builder(normalized_task, runtime)
+        if definition.input_builder is not None:
+            built = definition.input_builder(normalized_task, runtime)
             child_input = await built if inspect.isawaitable(built) else built
             if not isinstance(child_input, str) or not child_input.strip():
-                raise ValueError("subagent input_builder must return non-blank text")
+                raise ValueError("agent definition input_builder must return non-blank text")
             child_input = child_input.strip()
+
+        agent = build_child_agent(definition)
         ainvoke = getattr(agent, "ainvoke", None)
         if not callable(ainvoke):
             raise TypeError("Subagent does not expose ainvoke")
 
-        config = _subagent_config(runtime.config, spec)
-        async with asyncio.timeout(spec.timeout_seconds):
+        config = _agent_config(runtime.config, definition)
+        async with asyncio.timeout(definition.timeout_seconds):
             result = await ainvoke(
                 {"messages": [HumanMessage(content=child_input)]},
                 config=config,
                 context=runtime.context,
             )
-        payload = _subagent_result_payload(spec, result)
-        if spec.result_processor is not None:
-            processed = spec.result_processor(payload, runtime)
+        payload = _agent_result_payload(definition, result)
+        if definition.result_processor is not None:
+            processed = definition.result_processor(payload, runtime)
             payload = await processed if inspect.isawaitable(processed) else processed
-        return _render_subagent_result(spec, payload)
+        return _render_agent_result(definition, payload)
 
     return StructuredTool.from_function(
         coroutine=delegate,
-        name=spec.tool_name,
+        name=definition.tool_name,
         description=(
-            f"Delegate one bounded task to the {spec.name} specialist. "
-            f"{spec.description} Give description a short user-facing activity label, then give "
+            f"Delegate one bounded task to the {definition.name} specialist. "
+            f"{definition.description} Give description a short user-facing activity label, then give "
             "task only the specialist's objective and boundaries. Return its result to the lead "
             "agent for synthesis."
         ),
     )
 
 
-def _subagent_config(config: Mapping[str, Any] | None, spec: SubagentSpec) -> dict[str, Any]:
+def _agent_config(
+    config: Mapping[str, Any] | None,
+    definition: AgentDefinition,
+) -> dict[str, Any]:
     resolved = dict(config or {})
     tags = [
         str(tag)
         for tag in resolved.get("tags", [])
         if str(tag) != "lead_agent" and not str(tag).startswith("subagent:")
     ]
-    tags.append(f"subagent:{spec.name}")
+    tags.append(f"subagent:{definition.name}")
     resolved["tags"] = tags
-    resolved["recursion_limit"] = spec.recursion_limit
+    resolved["recursion_limit"] = definition.recursion_limit
 
     configurable = dict(resolved.get("configurable") or {})
     configurable.pop("checkpoint_id", None)
@@ -139,11 +148,11 @@ def _subagent_config(config: Mapping[str, Any] | None, spec: SubagentSpec) -> di
     return resolved
 
 
-def _subagent_result_payload(spec: SubagentSpec, result: Any) -> Any:
+def _agent_result_payload(definition: AgentDefinition, result: Any) -> Any:
     if not isinstance(result, Mapping):
         raise TypeError("Subagent result must be a graph-state mapping")
 
-    if spec.result_schema is not None:
+    if definition.result_schema is not None:
         structured = result.get("structured_response")
         if structured is None:
             raise RuntimeError("Subagent completed without a structured response")
@@ -154,9 +163,9 @@ def _subagent_result_payload(spec: SubagentSpec, result: Any) -> Any:
     return payload
 
 
-def _render_subagent_result(spec: SubagentSpec, payload: Any) -> str:
+def _render_agent_result(definition: AgentDefinition, payload: Any) -> str:
     return json.dumps(
-        {"subagent": spec.name, "result": _serialize_value(payload)},
+        {"subagent": definition.name, "result": _serialize_value(payload)},
         ensure_ascii=False,
         separators=(",", ":"),
     )
@@ -192,3 +201,6 @@ def _serialize_value(value: Any) -> Any:
     if value is None or isinstance(value, (str, int, float, bool)):
         return value
     return str(value)
+
+
+__all__ = ["AgentDefinition", "create_subagent_tool"]

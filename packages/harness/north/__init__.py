@@ -1,6 +1,6 @@
 """Reusable runtime primitives for North Agent host applications."""
 
-from .agent import build_agent
+from .agent import build_agent, create_chat_model
 from .agents.middlewares import (
     CompactionEvent,
     CompactionHook,
@@ -10,6 +10,15 @@ from .agents.middlewares import (
 from .checkpointer import CheckpointerConfig, make_checkpointer
 from .client import AppClient, ChatResponse, StreamEvent
 from .config import AppConfig
+from .plugins import (
+    AgentPlugin,
+    FunctionPlugin,
+    PluginContext,
+    PluginInstallation,
+    PluginScope,
+    RegistrationHandle,
+    install_plugins,
+)
 from .runtime import (
     ClarificationRequest,
     MemoryStreamBridge,
@@ -27,11 +36,13 @@ from .runtime import (
     invoke_agent_once,
     normalize_token_usage,
 )
-from .subagents import SubagentSpec, create_subagent_tool
+from .subagents import AgentDefinition, create_subagent_tool
 
 __all__ = [
     "AppClient",
     "AppConfig",
+    "AgentDefinition",
+    "AgentPlugin",
     "ChatResponse",
     "CheckpointerConfig",
     "ClarificationRequest",
@@ -50,12 +61,18 @@ __all__ = [
     "RuntimeUsageAccumulator",
     "StreamBridge",
     "StreamEvent",
-    "SubagentSpec",
+    "FunctionPlugin",
+    "PluginContext",
+    "PluginInstallation",
+    "PluginScope",
+    "RegistrationHandle",
     "TitleMiddleware",
     "TokenUsage",
     "build_agent",
+    "create_chat_model",
     "create_subagent_tool",
     "invoke_agent_once",
+    "install_plugins",
     "make_checkpointer",
     "normalize_token_usage",
 ]

@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 from langchain_core.messages import AIMessage
-from north.subagents import SubagentSpec, create_subagent_tool
+from north.subagents import AgentDefinition, create_subagent_tool
 
 
 class StubAgent:
@@ -29,8 +29,8 @@ def runtime(*, config=None, context=None):
     return SimpleNamespace(config=config or {}, context=context or {})
 
 
-def test_subagent_spec_normalizes_public_identity() -> None:
-    spec = SubagentSpec(
+def test_agent_definition_normalizes_public_identity() -> None:
+    spec = AgentDefinition(
         name=" case_analyst ",
         description=" Frame one case. ",
         system_prompt=" Analyze only grounded facts. ",
@@ -44,9 +44,9 @@ def test_subagent_spec_normalizes_public_identity() -> None:
 
 
 @pytest.mark.parametrize("name", ["CaseAnalyst", "case-analyst", "1analyst", ""])
-def test_subagent_spec_rejects_unsafe_names(name: str) -> None:
-    with pytest.raises(ValueError, match="subagent name"):
-        SubagentSpec(
+def test_agent_definition_rejects_unsafe_names(name: str) -> None:
+    with pytest.raises(ValueError, match="agent definition name"):
+        AgentDefinition(
             name=name,
             description="Frame one case.",
             system_prompt="Analyze grounded facts.",
@@ -58,13 +58,13 @@ def test_delegation_tool_propagates_parent_runtime_without_checkpoint() -> None:
     agent = StubAgent(
         {"messages": [AIMessage(content="争议焦点已整理。")]}
     )
-    spec = SubagentSpec(
+    spec = AgentDefinition(
         name="case_analyst",
         description="Frame one legal case.",
         system_prompt="Analyze grounded facts.",
         recursion_limit=12,
     )
-    tool = create_subagent_tool(spec, agent)
+    tool = create_subagent_tool(spec, lambda _definition: agent)
 
     result = asyncio.run(
         tool.coroutine(
@@ -111,7 +111,7 @@ def test_delegation_tool_returns_structured_response() -> None:
             },
         }
     )
-    spec = SubagentSpec(
+    spec = AgentDefinition(
         name="case_analyst",
         description="Frame one legal case.",
         system_prompt="Analyze grounded facts.",
@@ -119,7 +119,7 @@ def test_delegation_tool_returns_structured_response() -> None:
     )
 
     result = asyncio.run(
-        create_subagent_tool(spec, agent).coroutine(
+        create_subagent_tool(spec, lambda _definition: agent).coroutine(
             description="梳理案件事实",
             task="整理案件",
             runtime=runtime(),
@@ -145,7 +145,7 @@ def test_delegation_tool_processes_structured_result_with_runtime() -> None:
         observed.append((result, tool_runtime.context))
         return {"assessment": result, "response_contract": {"answer_first": True}}
 
-    spec = SubagentSpec(
+    spec = AgentDefinition(
         name="case_analyst",
         description="Frame one legal case.",
         system_prompt="Analyze grounded facts.",
@@ -154,7 +154,7 @@ def test_delegation_tool_processes_structured_result_with_runtime() -> None:
     )
 
     result = asyncio.run(
-        create_subagent_tool(spec, agent).coroutine(
+        create_subagent_tool(spec, lambda _definition: agent).coroutine(
             description="梳理案件事实",
             task="整理案件",
             runtime=runtime(context={"run_id": "run-1"}),
@@ -177,7 +177,7 @@ def test_delegation_tool_enforces_timeout() -> None:
             await asyncio.sleep(0.05)
             return {"messages": [AIMessage(content="late")]}
 
-    spec = SubagentSpec(
+    spec = AgentDefinition(
         name="researcher",
         description="Research one bounded question.",
         system_prompt="Return sourced findings.",
@@ -186,7 +186,7 @@ def test_delegation_tool_enforces_timeout() -> None:
 
     with pytest.raises(TimeoutError):
         asyncio.run(
-            create_subagent_tool(spec, SlowAgent()).coroutine(
+            create_subagent_tool(spec, lambda _definition: SlowAgent()).coroutine(
                 description="研究法规依据",
                 task="研究法规",
                 runtime=runtime(),
@@ -202,7 +202,7 @@ def test_delegation_tool_uses_host_owned_input_builder() -> None:
         observed.append((task, tool_runtime.context))
         return f"{task}\n<context>{tool_runtime.context['case_data']}</context>"
 
-    spec = SubagentSpec(
+    spec = AgentDefinition(
         name="case_analyst",
         description="Frame one legal case.",
         system_prompt="Analyze grounded facts.",
@@ -210,7 +210,7 @@ def test_delegation_tool_uses_host_owned_input_builder() -> None:
     )
 
     asyncio.run(
-        create_subagent_tool(spec, agent).coroutine(
+        create_subagent_tool(spec, lambda _definition: agent).coroutine(
             description="梳理案件事实",
             task="提取事实和问题",
             runtime=runtime(context={"case_data": "用户原话"}),

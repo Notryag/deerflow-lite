@@ -1,9 +1,11 @@
+import asyncio
 from types import SimpleNamespace
 
 import pytest
 from north.agent import build_agent, create_chat_model
 from north.config import AppConfig
-from north.subagents import SubagentSpec
+from north.plugins import FunctionPlugin
+from north.subagents import AgentDefinition
 
 
 def test_create_chat_model_defaults_plain_names_to_openai_provider(monkeypatch):
@@ -151,7 +153,6 @@ def test_build_agent_configures_run_aware_summarization(monkeypatch):
             summarization_min_growth_tokens=3000,
             summarization_max_emergency_compactions=2,
         ),
-        tools=[],
     )
 
     assert captured["normal_trigger_tokens"] == 6000
@@ -174,17 +175,21 @@ def test_build_agent_appends_host_middlewares_after_runtime_defaults(monkeypatch
 
     monkeypatch.setattr("north.agent.create_chat_model", lambda *args, **kwargs: StubModel())
     monkeypatch.setattr("north.agent._supports_tool_binding", lambda model: True)
-    monkeypatch.setattr(
-        "north.agent.resolve_middlewares", lambda config: [runtime_middleware]
-    )
+    monkeypatch.setattr("north.agent.get_builtin_tools", lambda: [])
+    monkeypatch.setattr("north.agent.get_default_middlewares", lambda: [runtime_middleware])
     monkeypatch.setattr(
         "north.agent.create_agent", lambda **kwargs: captured.update(kwargs) or object()
     )
 
     build_agent(
         AppConfig(model_name="openai:gpt-test"),
-        tools=[],
-        additional_middlewares=[host_middleware],
+        plugins=[
+            FunctionPlugin(
+                plugin_id="host.middleware",
+                installer=lambda context: context.register_middleware(host_middleware),
+                requires=("north.runtime",),
+            )
+        ],
     )
 
     assert captured["middleware"] == [runtime_middleware, host_middleware]
@@ -204,28 +209,57 @@ def test_build_agent_isolates_subagent_tools_and_checkpointer(monkeypatch):
 
     monkeypatch.setattr("north.agent.create_chat_model", lambda *args, **kwargs: StubModel())
     monkeypatch.setattr("north.agent._supports_tool_binding", lambda model: True)
+    monkeypatch.setattr("north.agent.get_builtin_tools", lambda: [])
+    monkeypatch.setattr("north.agent.get_default_middlewares", lambda: [])
+
+    class StubGraph:
+        async def ainvoke(self, graph_input, *, config=None, context=None):
+            del graph_input, config, context
+            return {"structured_response": {}}
+
     monkeypatch.setattr(
         "north.agent.create_agent",
-        lambda **kwargs: calls.append(kwargs) or object(),
+        lambda **kwargs: calls.append(kwargs) or StubGraph(),
     )
+
+    definition = AgentDefinition(
+        name="case_analyst",
+        description="Frame one legal case.",
+        system_prompt="Specialist prompt.",
+        tools=(specialist_tool,),
+        result_schema=dict,
+        recursion_limit=10,
+    )
+
+    def install_host(context):
+        context.register_tool(lead_tool)
+        context.register_agent_definition(definition)
+        return None
 
     build_agent(
         AppConfig(model_name="openai:gpt-test", system_prompt="Lead prompt."),
-        tools=[lead_tool],
         checkpointer=parent_checkpointer,
-        subagents=[
-            SubagentSpec(
-                name="case_analyst",
-                description="Frame one legal case.",
-                system_prompt="Specialist prompt.",
-                tools=(specialist_tool,),
-                result_schema=dict,
-                recursion_limit=10,
+        plugins=[
+            FunctionPlugin(
+                plugin_id="host.legal",
+                installer=install_host,
+                requires=("north.runtime",),
             )
         ],
     )
 
-    child_call, lead_call = calls
+    lead_call = calls[0]
+    delegation_tool = next(
+        tool for tool in lead_call["tools"] if tool.name == "delegate_case_analyst"
+    )
+    asyncio.run(
+        delegation_tool.coroutine(
+            description="梳理案件",
+            task="整理事实",
+            runtime=SimpleNamespace(config={}, context={}),
+        )
+    )
+    child_call = calls[1]
     assert child_call["system_prompt"] == "Specialist prompt."
     assert child_call["tools"] == [specialist_tool]
     assert child_call["checkpointer"] is None
@@ -247,16 +281,28 @@ def test_build_agent_rejects_delegation_tool_collision(monkeypatch):
 
     monkeypatch.setattr("north.agent.create_chat_model", lambda *args, **kwargs: StubModel())
     monkeypatch.setattr("north.agent._supports_tool_binding", lambda model: True)
+    monkeypatch.setattr("north.agent.get_builtin_tools", lambda: [])
+    monkeypatch.setattr("north.agent.get_default_middlewares", lambda: [])
 
     with pytest.raises(ValueError, match="Duplicate delegation tool name"):
+        definition = AgentDefinition(
+            name="case_analyst",
+            description="Frame one legal case.",
+            system_prompt="Specialist prompt.",
+        )
+
+        def install_host(context):
+            context.register_tool(SimpleNamespace(name="delegate_case_analyst"))
+            context.register_agent_definition(definition)
+            return None
+
         build_agent(
             AppConfig(model_name="openai:gpt-test"),
-            tools=[SimpleNamespace(name="delegate_case_analyst")],
-            subagents=[
-                SubagentSpec(
-                    name="case_analyst",
-                    description="Frame one legal case.",
-                    system_prompt="Specialist prompt.",
+            plugins=[
+                FunctionPlugin(
+                    plugin_id="host.collision",
+                    installer=install_host,
+                    requires=("north.runtime",),
                 )
             ],
         )

@@ -2,9 +2,6 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from langchain.agents.middleware import AgentMiddleware
-
-from ..agents.middlewares import get_default_middlewares
 from ..checkpointer import get_default_checkpointer
 from ..config import AppConfig
 from ..skills import SkillSpec, compose_system_prompt, load_all_skills, load_skills
@@ -72,12 +69,6 @@ def get_system_prompt(
     return compose_system_prompt(config.system_prompt, resolved_skills)
 
 
-def get_middlewares(config: AppConfig) -> Sequence[AgentMiddleware]:
-    """Resolve runtime middlewares for the given config."""
-    _ = config
-    return get_default_middlewares()
-
-
 def get_checkpointer(config: AppConfig):
     """Resolve the default checkpointer for the given config."""
     _ = config
@@ -114,7 +105,6 @@ __all__ = [
     "HEARTBEAT_SENTINEL",
     "TokenUsage",
     "get_checkpointer",
-    "get_middlewares",
     "get_skills",
     "get_state_schema",
     "get_system_prompt",

@@ -141,21 +141,15 @@ docs/                     架构、演进计划和设计记录
 - `north.RuntimeJournal`：模型和工具运行事件
 - `north.make_checkpointer`：Memory、SQLite、PostgreSQL 持久化
 - `north.NorthSummarizationMiddleware`：上下文压缩
-- `north.TitleMiddleware`：首轮对话标题生成；宿主决定是否启用及如何同步产品元数据
+- `north.AgentPlugin` / `north.FunctionPlugin`：宿主显式组合工具、Middleware、Provider 和
+  Agent Definition
+- `north.AgentDefinition`：声明按委派请求懒创建的有界子 Agent
 
-标题能力默认关闭。宿主可以通过 `AppConfig` 启用，标题在同一个 Agent Run 的
-`after_model` 阶段生成并写入 `ThreadState.title`，不会创建额外 Run 或消息：
+标题等产品能力由宿主 Plugin 显式安装。North 不再从 `AppConfig` 猜测标题配置，也不再提供
+裸 Middleware 装配参数；当前 North 提供的 `TitleMiddleware` 仍可由宿主 Plugin 安装，后续将
+迁移为异步 Title Service。
 
-```python
-config = AppConfig(
-    model_name="openai:gpt-4o-mini",
-    auto_title_enabled=True,
-    title_model_name="openai:gpt-4o-mini",
-    title_max_chars=32,
-)
-```
-
-未配置可用标题模型或模型调用失败时，中间件使用首条用户消息的有界截取作为兜底。
+宿主应把产品工具和扩展能力放入 Plugin 组合根，再将插件集合传给 `build_agent`。
 
 ## 开发
 

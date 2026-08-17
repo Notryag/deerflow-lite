@@ -25,7 +25,7 @@ authorization, business memory, persistence, budgets beyond the per-call limits,
 North graphs and delegation tools declare a dictionary runtime context schema so the host's parent
 Run context can pass to subagent tools without becoming graph state or producing serializer ambiguity.
 Each delegation carries a short user-facing `description` separately from its bounded `task`, matching
-DeerFlow's observable task contract. A host may also provide `SubagentSpec.input_builder` to attach an
+DeerFlow's observable task contract. An `AgentDefinition.input_builder` may attach an
 exact, host-owned context projection to the child input. North invokes that callback but never chooses,
 stores, or interprets the business data it returns.
 

@@ -33,18 +33,6 @@ def test_from_env_parses_run_aware_summarization_settings(monkeypatch) -> None:
     assert config.summarization_max_emergency_compactions == 2
 
 
-def test_from_env_parses_auto_title_settings(monkeypatch) -> None:
-    monkeypatch.setenv("APP_AUTO_TITLE_ENABLED", "true")
-    monkeypatch.setenv("APP_TITLE_MODEL_NAME", "openai:gpt-4o-mini")
-    monkeypatch.setenv("APP_TITLE_MAX_CHARS", "32")
-
-    config = AppConfig.from_env()
-
-    assert config.auto_title_enabled is True
-    assert config.title_model_name == "openai:gpt-4o-mini"
-    assert config.title_max_chars == 32
-
-
 def test_from_env_uses_explicit_host_path_defaults(monkeypatch, tmp_path):
     monkeypatch.delenv("APP_SKILLS_DIR", raising=False)
     monkeypatch.delenv("APP_THREAD_BASE_DIR", raising=False)
