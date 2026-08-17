@@ -27,6 +27,7 @@ class AgentDefinition:
     name: str
     description: str
     system_prompt: str
+    display_name: str | None = None
     tools: tuple[Any, ...] = ()
     skills: tuple[str, ...] = ()
     result_schema: Any | None = None
@@ -39,6 +40,7 @@ class AgentDefinition:
         name = self.name.strip()
         description = self.description.strip()
         system_prompt = self.system_prompt.strip()
+        display_name = (self.display_name or name).strip()
         if not _AGENT_NAME_PATTERN.fullmatch(name):
             raise ValueError(
                 "agent definition name must start with a lowercase letter and contain "
@@ -48,6 +50,8 @@ class AgentDefinition:
             raise ValueError("agent definition description cannot be blank")
         if not system_prompt:
             raise ValueError("agent definition system_prompt cannot be blank")
+        if not display_name:
+            raise ValueError("agent definition display_name cannot be blank")
         if isinstance(self.timeout_seconds, bool) or self.timeout_seconds <= 0:
             raise ValueError("agent definition timeout_seconds must be positive")
         if isinstance(self.recursion_limit, bool) or self.recursion_limit < 2:
@@ -61,6 +65,7 @@ class AgentDefinition:
         object.__setattr__(self, "name", name)
         object.__setattr__(self, "description", description)
         object.__setattr__(self, "system_prompt", system_prompt)
+        object.__setattr__(self, "display_name", display_name)
         object.__setattr__(self, "tools", tuple(self.tools))
         object.__setattr__(self, "skills", tuple(normalized_skills))
 
@@ -122,6 +127,10 @@ def create_subagent_tool(
             "task only the specialist's objective and boundaries. Return its result to the lead "
             "agent for synthesis."
         ),
+        metadata={
+            "subagent_type": definition.name,
+            "display_name": definition.display_name,
+        },
     )
 
 

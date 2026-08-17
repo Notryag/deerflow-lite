@@ -116,7 +116,10 @@ async def _assert_subagent_event_lineage() -> None:
 
     await journal.on_chain_start({}, {}, run_id=lead_chain_id)
     await journal.on_tool_start(
-        {"name": "delegate_case_analyst"},
+        {
+            "name": "delegate_case_analyst",
+            "metadata": {"display_name": "案件分析 Agent"},
+        },
         "",
         run_id=task_id,
         parent_run_id=lead_chain_id,
@@ -170,6 +173,8 @@ async def _assert_subagent_event_lineage() -> None:
         "task_id": str(task_id),
         "description": "梳理案件事实",
     }
+    assert subagent_events[0].metadata["display_name"] == "案件分析 Agent"
+    assert subagent_events[-1].metadata["display_name"] == "案件分析 Agent"
     assert [event.content["message_index"] for event in subagent_events[1:3]] == [
         0,
         1,

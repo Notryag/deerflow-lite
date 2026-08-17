@@ -40,6 +40,7 @@ def test_agent_definition_normalizes_public_identity() -> None:
     assert spec.name == "case_analyst"
     assert spec.tool_name == "delegate_case_analyst"
     assert spec.description == "Frame one case."
+    assert spec.display_name == "case_analyst"
     assert spec.skills == ("case-framing",)
 
 
@@ -65,6 +66,11 @@ def test_delegation_tool_propagates_parent_runtime_without_checkpoint() -> None:
         recursion_limit=12,
     )
     tool = create_subagent_tool(spec, lambda _definition: agent)
+
+    assert tool.metadata == {
+        "subagent_type": "case_analyst",
+        "display_name": "case_analyst",
+    }
 
     result = asyncio.run(
         tool.coroutine(

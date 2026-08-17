@@ -94,6 +94,7 @@ class RuntimeJournal(AsyncCallbackHandler):
         self._tool_parent_ids: dict[str, str | None] = {}
         self._parents: dict[str, str | None] = {}
         self._subagent_tasks: dict[str, str] = {}
+        self._subagent_display_names: dict[str, str] = {}
         self._subagent_step_indexes: dict[str, int] = {}
         self._model_call_index = 0
 
@@ -226,7 +227,7 @@ class RuntimeJournal(AsyncCallbackHandler):
         inputs: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> None:
-        del kwargs
+        callback_metadata = kwargs.get("metadata")
         call_id = str(run_id)
         tool_name = str((serialized or {}).get("name") or "unknown")
         caller = _identify_caller(tags)
@@ -253,6 +254,17 @@ class RuntimeJournal(AsyncCallbackHandler):
         if subagent_name is not None:
             self._subagent_tasks[call_id] = subagent_name
             self._subagent_step_indexes[call_id] = 0
+            display_name = _tool_display_name(serialized, callback_metadata)
+            if display_name is not None:
+                self._subagent_display_names[call_id] = display_name
+            subagent_metadata = {
+                "task_id": call_id,
+                "subagent_type": subagent_name,
+                "caller": caller,
+                "parent_call_id": parent_call_id,
+            }
+            if display_name is not None:
+                subagent_metadata["display_name"] = display_name
             await self._emit(
                 "subagent.start",
                 "subagent",
@@ -260,12 +272,7 @@ class RuntimeJournal(AsyncCallbackHandler):
                     "task_id": call_id,
                     "description": _task_description(inputs, input_str),
                 },
-                metadata={
-                    "task_id": call_id,
-                    "subagent_type": subagent_name,
-                    "caller": caller,
-                    "parent_call_id": parent_call_id,
-                },
+                metadata=subagent_metadata,
             )
 
     async def on_tool_end(self, output: Any, *, run_id: UUID, **kwargs: Any) -> None:
@@ -300,9 +307,17 @@ class RuntimeJournal(AsyncCallbackHandler):
         subagent_name = self._subagent_tasks.pop(call_id, None)
         if subagent_name is not None:
             self._subagent_step_indexes.pop(call_id, None)
+            display_name = self._subagent_display_names.pop(call_id, None)
             result_text, result_truncated = _truncate_with_flag(
                 _serialized_text(output)
             )
+            subagent_metadata = {
+                "task_id": call_id,
+                "subagent_type": subagent_name,
+                "latency_ms": latency_ms,
+            }
+            if display_name is not None:
+                subagent_metadata["display_name"] = display_name
             await self._emit(
                 "subagent.end",
                 "subagent",
@@ -312,11 +327,7 @@ class RuntimeJournal(AsyncCallbackHandler):
                     "result": result_text,
                     "result_truncated": result_truncated,
                 },
-                metadata={
-                    "task_id": call_id,
-                    "subagent_type": subagent_name,
-                    "latency_ms": latency_ms,
-                },
+                metadata=subagent_metadata,
             )
 
     async def on_tool_error(
@@ -353,6 +364,15 @@ class RuntimeJournal(AsyncCallbackHandler):
         subagent_name = self._subagent_tasks.pop(call_id, None)
         if subagent_name is not None:
             self._subagent_step_indexes.pop(call_id, None)
+            display_name = self._subagent_display_names.pop(call_id, None)
+            subagent_metadata = {
+                "task_id": call_id,
+                "subagent_type": subagent_name,
+                "latency_ms": latency_ms,
+                "error_type": type(error).__name__,
+            }
+            if display_name is not None:
+                subagent_metadata["display_name"] = display_name
             await self._emit(
                 "subagent.end",
                 "subagent",
@@ -363,12 +383,7 @@ class RuntimeJournal(AsyncCallbackHandler):
                     ),
                     "error": str(error),
                 },
-                metadata={
-                    "task_id": call_id,
-                    "subagent_type": subagent_name,
-                    "latency_ms": latency_ms,
-                    "error_type": type(error).__name__,
-                },
+                metadata=subagent_metadata,
             )
 
     def _task_for_call(self, call_id: str) -> str | None:
@@ -451,6 +466,20 @@ def _delegated_subagent_name(tool_name: str) -> str | None:
     if not tool_name.startswith(prefix) or len(tool_name) == len(prefix):
         return None
     return tool_name.removeprefix(prefix)
+
+
+def _tool_display_name(
+    serialized: Mapping[str, Any], callback_metadata: object = None
+) -> str | None:
+    metadata = serialized.get("metadata")
+    candidates = (metadata, callback_metadata)
+    for candidate in candidates:
+        if not isinstance(candidate, Mapping):
+            continue
+        value = candidate.get("display_name")
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return None
 
 
 def _task_description(inputs: dict[str, Any] | None, input_str: str) -> str:
