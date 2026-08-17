@@ -10,7 +10,11 @@ from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import SystemMessage
 from langchain_core.messages.utils import count_tokens_approximately
 
-from .agents.middlewares import CompactionHook, NorthSummarizationMiddleware
+from .agents.middlewares import (
+    CompactionHook,
+    NorthSummarizationMiddleware,
+    TitleMiddleware,
+)
 from .config import AppConfig
 from .runtime import (
     get_checkpointer as resolve_checkpointer,
@@ -139,6 +143,7 @@ def _build_agent(
                 skills_dir=(config.skills_dir if spec.skills else None),
                 enabled_skills=spec.skills,
                 recursion_limit=spec.recursion_limit,
+                auto_title_enabled=False,
             )
             child_agent = _build_agent(
                 child_config,
@@ -162,6 +167,19 @@ def _build_agent(
     )
     if additional_middlewares is not None:
         resolved_middlewares.extend(additional_middlewares)
+    if config.auto_title_enabled:
+        title_model_name = config.title_model_name or config.model_name
+        title_model = create_chat_model(
+            title_model_name,
+            **({"default_headers": config.model_headers} if config.model_headers else {}),
+            **({"model_options": config.model_options} if config.model_options else {}),
+        )
+        resolved_middlewares.append(
+            TitleMiddleware(
+                model=title_model,
+                max_chars=config.title_max_chars,
+            )
+        )
     if config.summarization_enabled:
         summary_model = (
             create_chat_model(

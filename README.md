@@ -11,6 +11,7 @@ Skills、运行事件和上下文持久化收敛到稳定边界，让宿主应�
 - 本地 Skill 发现、目录过滤和按需加载
 - Memory、SQLite、PostgreSQL Checkpointer
 - 上下文摘要压缩与宿主归档 Hook
+- 首轮对话标题生成 Middleware，可选独立标题模型并自动写入 checkpoint state
 - 模型及工具调用事件、Token 用量归一化
 - 上传文件、Workspace、Output 等资源 URI
 
@@ -140,6 +141,21 @@ docs/                     架构、演进计划和设计记录
 - `north.RuntimeJournal`：模型和工具运行事件
 - `north.make_checkpointer`：Memory、SQLite、PostgreSQL 持久化
 - `north.NorthSummarizationMiddleware`：上下文压缩
+- `north.TitleMiddleware`：首轮对话标题生成；宿主决定是否启用及如何同步产品元数据
+
+标题能力默认关闭。宿主可以通过 `AppConfig` 启用，标题在同一个 Agent Run 的
+`after_model` 阶段生成并写入 `ThreadState.title`，不会创建额外 Run 或消息：
+
+```python
+config = AppConfig(
+    model_name="openai:gpt-4o-mini",
+    auto_title_enabled=True,
+    title_model_name="openai:gpt-4o-mini",
+    title_max_chars=32,
+)
+```
+
+未配置可用标题模型或模型调用失败时，中间件使用首条用户消息的有界截取作为兜底。
 
 ## 开发
 

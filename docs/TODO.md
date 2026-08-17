@@ -74,9 +74,14 @@
   原因：
   当前闭环不依赖图像理解。
 
-- [-] S5. title middleware / todo middleware
+- [x] S5. title middleware
+  已由 Lexora 的真实宿主需求驱动完成。标题是可选的通用 `ThreadState` 元数据能力，
+  在首轮 Agent Run 的 middleware hook 中生成，不创建独立 Run 或消息；宿主负责把 state
+  投影到产品自己的会话元数据。
+
+- [-] S5b. todo middleware
   原因：
-  属于外围能力，不是当前主线。
+  尚无第二个真实宿主需求，不提前泛化。
 
 - [-] S7. 大而全工具注册系统
   原因：

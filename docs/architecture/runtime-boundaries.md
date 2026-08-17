@@ -155,7 +155,7 @@ class ThreadState(AgentState):
 
 - 提前引入完整 sandbox
 - 提前引入 memory
-- 提前引入 title / todo 等外围能力
+- 提前引入 todo 等尚无宿主需求的外围能力
 - 提前引入过多工具
 - 提前引入多子代理协作
 
@@ -173,3 +173,15 @@ Sandbox。完整边界见 [code-execution-boundary.md](./code-execution-boundary
 ## 当前阶段的架构策略
 
 > 保持 `app -> north` 单向依赖；Harness 负责产品无关契约，宿主负责业务与基础设施装配。
+## Thread Title Middleware
+
+`TitleMiddleware` is an opt-in runtime capability for thread-level metadata. It runs in the lead
+Agent's `after_model`/`aafter_model` hook after the first complete user/assistant exchange and
+returns `{"title": "..."}` into the shared `ThreadState`. The checkpoint therefore persists the
+title without creating a second Run, message, or subagent.
+
+The middleware knows nothing about a host product's domain. A host may configure a lightweight title
+model, or rely on the bounded first-message fallback, and then project `ThreadState.title` into its
+own conversation/case metadata. Child subagents do not inherit auto-title middleware. User-edited
+product titles must be treated as authoritative by the host and must never be overwritten by this
+runtime projection.

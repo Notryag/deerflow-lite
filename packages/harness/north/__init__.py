@@ -5,6 +5,7 @@ from .agents.middlewares import (
     CompactionEvent,
     CompactionHook,
     NorthSummarizationMiddleware,
+    TitleMiddleware,
 )
 from .checkpointer import CheckpointerConfig, make_checkpointer
 from .client import AppClient, ChatResponse, StreamEvent
@@ -50,6 +51,7 @@ __all__ = [
     "StreamBridge",
     "StreamEvent",
     "SubagentSpec",
+    "TitleMiddleware",
     "TokenUsage",
     "build_agent",
     "create_subagent_tool",

@@ -3,13 +3,24 @@ from types import SimpleNamespace
 
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langgraph.types import Command
-
 from north.agents.middlewares import (
     ClarificationMiddleware,
     LoopDetectionMiddleware,
+    TitleMiddleware,
     ToolErrorHandlingMiddleware,
     get_default_middlewares,
 )
+
+
+class _TitleModel:
+    def __init__(self, content: str = "劳动合同解除补偿") -> None:
+        self.content = content
+        self.calls = 0
+
+    async def ainvoke(self, prompt, config=None):
+        del prompt, config
+        self.calls += 1
+        return AIMessage(content=self.content)
 
 
 def test_default_middlewares_are_registered():
@@ -20,6 +31,53 @@ def test_default_middlewares_are_registered():
         "LoopDetectionMiddleware",
         "ClarificationMiddleware",
     ]
+
+
+def test_title_middleware_generates_once_after_first_exchange():
+    model = _TitleModel()
+    middleware = TitleMiddleware(model=model, max_chars=20)
+    state = {
+        "messages": [
+            HumanMessage(content="公司辞退我，应该怎么索要赔偿？"),
+            AIMessage(content="需要先区分合法解除和违法解除。"),
+        ]
+    }
+
+    result = asyncio.run(middleware.aafter_model(state, SimpleNamespace()))
+
+    assert result == {"title": "劳动合同解除补偿"}
+    assert model.calls == 1
+
+
+def test_title_middleware_does_not_overwrite_existing_title():
+    model = _TitleModel()
+    middleware = TitleMiddleware(model=model)
+    state = {
+        "title": "用户命名的案件",
+        "messages": [
+            HumanMessage(content="公司辞退我"),
+            AIMessage(content="请补充解除理由。"),
+        ],
+    }
+
+    result = asyncio.run(middleware.aafter_model(state, SimpleNamespace()))
+
+    assert result is None
+    assert model.calls == 0
+
+
+def test_title_middleware_falls_back_to_first_user_message():
+    middleware = TitleMiddleware(model=None, max_chars=12)
+    state = {
+        "messages": [
+            HumanMessage(content="公司没有提前通知就把我辞退了"),
+            AIMessage(content="可以先核对解除通知。"),
+        ]
+    }
+
+    result = asyncio.run(middleware.aafter_model(state, SimpleNamespace()))
+
+    assert result == {"title": "公司没有提前通知就..."}
 
 
 def test_tool_error_middleware_converts_exceptions_to_tool_message():

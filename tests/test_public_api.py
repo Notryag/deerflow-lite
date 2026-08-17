@@ -24,6 +24,7 @@ def test_top_level_public_api_is_explicit() -> None:
         "StreamBridge",
         "StreamEvent",
         "SubagentSpec",
+        "TitleMiddleware",
         "TokenUsage",
         "build_agent",
         "create_subagent_tool",

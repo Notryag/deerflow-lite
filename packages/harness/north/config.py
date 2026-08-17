@@ -59,6 +59,9 @@ class AppConfig:
     summarization_target_tokens: int = 2000
     summarization_min_growth_tokens: int = 3000
     summarization_max_emergency_compactions: int = 2
+    auto_title_enabled: bool = False
+    title_model_name: str | None = None
+    title_max_chars: int = 60
 
     @classmethod
     def from_env(
@@ -105,6 +108,9 @@ class AppConfig:
             summarization_max_emergency_compactions=_get_int(
                 "APP_SUMMARIZATION_MAX_EMERGENCY_COMPACTIONS", 2
             ),
+            auto_title_enabled=_get_bool("APP_AUTO_TITLE_ENABLED", False),
+            title_model_name=os.getenv("APP_TITLE_MODEL_NAME"),
+            title_max_chars=_get_int("APP_TITLE_MAX_CHARS", 60),
         )
 
     def validate(self) -> None:
