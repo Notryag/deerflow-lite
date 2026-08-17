@@ -37,6 +37,7 @@ from .runtime import (
     normalize_token_usage,
 )
 from .subagents import AgentDefinition, create_subagent_tool
+from .title import ConversationTitleService, TitleProvider
 
 __all__ = [
     "AppClient",
@@ -48,6 +49,7 @@ __all__ = [
     "ClarificationRequest",
     "CompactionEvent",
     "CompactionHook",
+    "ConversationTitleService",
     "MemoryStreamBridge",
     "NorthSummarizationMiddleware",
     "RedisStreamBridge",
@@ -67,6 +69,7 @@ __all__ = [
     "PluginScope",
     "RegistrationHandle",
     "TitleMiddleware",
+    "TitleProvider",
     "TokenUsage",
     "build_agent",
     "create_chat_model",

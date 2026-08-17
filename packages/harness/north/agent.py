@@ -21,7 +21,7 @@ from .runtime import get_checkpointer as resolve_checkpointer
 from .runtime import get_skills as resolve_skills
 from .runtime import get_state_schema
 from .runtime import get_system_prompt as resolve_system_prompt
-from .subagents import AgentDefinition, create_subagent_tool
+from .subagents import create_subagent_tool
 from .tools import get_builtin_tools
 
 

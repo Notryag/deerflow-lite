@@ -27,6 +27,8 @@
 
 - `CheckpointerConfig`、`make_checkpointer`：管理 Checkpointer 生命周期
 - `NorthSummarizationMiddleware`、`CompactionEvent`、`CompactionHook`：上下文压缩与宿主归档 Hook
+- `ConversationTitleService`、`TitleProvider`：产品无关的标题规则与宿主选择的生成 Provider；
+  Middleware 只是当前 Agent 状态消费方式
 
 ## 可观测性
 

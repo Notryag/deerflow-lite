@@ -10,6 +10,7 @@ from north.agents.middlewares import (
     ToolErrorHandlingMiddleware,
     get_default_middlewares,
 )
+from north.title import ConversationTitleService
 
 
 class _TitleModel:
@@ -18,6 +19,11 @@ class _TitleModel:
         self.calls = 0
 
     async def ainvoke(self, prompt, config=None):
+        del prompt, config
+        self.calls += 1
+        return AIMessage(content=self.content)
+
+    def invoke(self, prompt, config=None):
         del prompt, config
         self.calls += 1
         return AIMessage(content=self.content)
@@ -35,7 +41,9 @@ def test_default_middlewares_are_registered():
 
 def test_title_middleware_generates_once_after_first_exchange():
     model = _TitleModel()
-    middleware = TitleMiddleware(model=model, max_chars=20)
+    middleware = TitleMiddleware(
+        service=ConversationTitleService(provider=model, max_chars=20)
+    )
     state = {
         "messages": [
             HumanMessage(content="公司辞退我，应该怎么索要赔偿？"),
@@ -51,7 +59,7 @@ def test_title_middleware_generates_once_after_first_exchange():
 
 def test_title_middleware_does_not_overwrite_existing_title():
     model = _TitleModel()
-    middleware = TitleMiddleware(model=model)
+    middleware = TitleMiddleware(service=ConversationTitleService(provider=model))
     state = {
         "title": "用户命名的案件",
         "messages": [
@@ -67,7 +75,9 @@ def test_title_middleware_does_not_overwrite_existing_title():
 
 
 def test_title_middleware_falls_back_to_first_user_message():
-    middleware = TitleMiddleware(model=None, max_chars=12)
+    middleware = TitleMiddleware(
+        service=ConversationTitleService(provider=None, max_chars=12)
+    )
     state = {
         "messages": [
             HumanMessage(content="公司没有提前通知就把我辞退了"),
