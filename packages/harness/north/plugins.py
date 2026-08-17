@@ -38,8 +38,6 @@ class PluginContext:
     tools: list[Any]
     middlewares: list[AgentMiddleware]
     agent_definitions: list[AgentDefinition]
-    services: dict[str, Any]
-    providers: dict[str, Any]
     _handles: list[RegistrationHandle]
 
     def register_tool(self, tool: Any) -> RegistrationHandle:
@@ -76,33 +74,6 @@ class PluginContext:
         handle = RegistrationHandle(dispose)
         self._handles.append(handle)
         return handle
-
-    def register_service(self, key: str, service: Any) -> RegistrationHandle:
-        if key in self.services:
-            raise ValueError(f"Duplicate service registration: {key}")
-        self.services[key] = service
-
-        def dispose() -> None:
-            if self.services.get(key) is service:
-                del self.services[key]
-
-        handle = RegistrationHandle(dispose)
-        self._handles.append(handle)
-        return handle
-
-    def register_provider(self, key: str, provider: Any) -> RegistrationHandle:
-        if key in self.providers:
-            raise ValueError(f"Duplicate provider registration: {key}")
-        self.providers[key] = provider
-
-        def dispose() -> None:
-            if self.providers.get(key) is provider:
-                del self.providers[key]
-
-        handle = RegistrationHandle(dispose)
-        self._handles.append(handle)
-        return handle
-
 
 class AgentPlugin(Protocol):
     """Plugin contract for host-owned Agent composition."""
@@ -181,8 +152,6 @@ def install_plugins(
 
     middlewares: list[AgentMiddleware] = []
     definitions: list[AgentDefinition] = []
-    services: dict[str, Any] = {}
-    providers: dict[str, Any] = {}
     handles: list[RegistrationHandle] = []
     context = PluginContext(
         config=config,
@@ -193,8 +162,6 @@ def install_plugins(
         tools=tools,
         middlewares=middlewares,
         agent_definitions=definitions,
-        services=services,
-        providers=providers,
         _handles=handles,
     )
     installed_ids: set[str] = set()
@@ -216,8 +183,6 @@ def install_plugins(
                 tools=context.tools,
                 middlewares=context.middlewares,
                 agent_definitions=context.agent_definitions,
-                services=context.services,
-                providers=context.providers,
                 _handles=context._handles,
             )
             handle = plugin.install(scoped_context)

@@ -146,8 +146,8 @@ docs/                     架构、演进计划和设计记录
 - `north.AgentDefinition`：声明按委派请求懒创建的有界子 Agent
 
 标题等产品能力由宿主 Plugin 显式安装。North 不再从 `AppConfig` 猜测标题配置，也不再提供
-裸 Middleware 装配参数。`ConversationTitleService` 定义通用生成和 fallback 规则，宿主 Plugin
-注册 Provider，并按产品时序选择 Middleware 或后台事件消费者调用该 Service。
+裸 Middleware 装配参数。需要标题时，宿主 Plugin 直接注册 `TitleMiddleware`，并由宿主决定
+标题策略和持久化方式。
 
 宿主应把产品工具和扩展能力放入 Plugin 组合根，再将插件集合传给 `build_agent`。
 

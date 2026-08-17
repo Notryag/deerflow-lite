@@ -47,34 +47,6 @@ def test_plugin_registration_is_reversible() -> None:
     assert installation.context.tools == []
 
 
-def test_plugin_service_and_provider_roles_are_registered_and_reversible() -> None:
-    service = object()
-    provider = object()
-
-    def install(context):
-        context.register_provider("title", provider)
-        context.register_service("title", service)
-
-    installation = _install(
-        [FunctionPlugin(plugin_id="title", installer=install)]
-    )
-
-    assert installation.context.providers == {"title": provider}
-    assert installation.context.services == {"title": service}
-    installation.dispose()
-    assert installation.context.providers == {}
-    assert installation.context.services == {}
-
-
-def test_plugin_registry_rejects_duplicate_service_roles() -> None:
-    def install(context):
-        context.register_service("title", object())
-        context.register_service("title", object())
-
-    with pytest.raises(ValueError, match="Duplicate service registration"):
-        _install([FunctionPlugin(plugin_id="title", installer=install)])
-
-
 def test_plugin_registry_rejects_duplicate_ids() -> None:
     plugin = FunctionPlugin(plugin_id="duplicate", installer=lambda context: None)
 
