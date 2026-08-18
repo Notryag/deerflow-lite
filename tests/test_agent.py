@@ -195,6 +195,51 @@ def test_build_agent_appends_host_middlewares_after_runtime_defaults(monkeypatch
     assert captured["middleware"] == [runtime_middleware, host_middleware]
 
 
+def test_build_agent_preserves_tools_after_model_observability_wrapping(monkeypatch):
+    captured = {}
+    host_tool = SimpleNamespace(name="host_tool")
+
+    class ToolCapableModel:
+        def bind_tools(self, tools, **kwargs):
+            del tools, kwargs
+            return self
+
+        def with_config(self, **kwargs):
+            return TaggedModel(self, kwargs)
+
+    class TaggedModel:
+        def __init__(self, bound, config):
+            self.bound = bound
+            self.config = config
+
+        def __getattr__(self, name):
+            return getattr(self.bound, name)
+
+    monkeypatch.setattr(
+        "north.agent.create_chat_model",
+        lambda *args, **kwargs: ToolCapableModel(),
+    )
+    monkeypatch.setattr("north.agent.get_builtin_tools", lambda: [])
+    monkeypatch.setattr("north.agent.get_default_middlewares", lambda: [])
+    monkeypatch.setattr(
+        "north.agent.create_agent", lambda **kwargs: captured.update(kwargs) or object()
+    )
+
+    build_agent(
+        AppConfig(model_name="openai:gpt-test"),
+        plugins=[
+            FunctionPlugin(
+                plugin_id="host.tools",
+                installer=lambda context: context.register_tool(host_tool),
+                requires=("north.runtime",),
+            )
+        ],
+    )
+
+    assert captured["tools"] == [host_tool]
+    assert captured["model"].config == {"tags": ["lead_agent"]}
+
+
 def test_build_agent_isolates_subagent_tools_and_checkpointer(monkeypatch):
     calls = []
     model_tags = []

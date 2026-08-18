@@ -160,6 +160,7 @@ def _build_agent(
         **({"default_headers": config.model_headers} if config.model_headers else {}),
         **({"model_options": config.model_options} if config.model_options else {}),
     )
+    supports_tool_binding = _supports_tool_binding(model)
     with_config = getattr(model, "with_config", None)
     if callable(with_config):
         model = with_config(tags=[caller_tag])
@@ -215,7 +216,7 @@ def _build_agent(
         )
         resolved_tools.append(child_agent)
 
-    if not _supports_tool_binding(model):
+    if not supports_tool_binding:
         resolved_tools = []
 
     return create_agent(
